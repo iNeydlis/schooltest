@@ -12,23 +12,25 @@ const TestResult = () => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        // Если результат не передан через location state, загружаем его
+        // If result wasn't passed via location state, load it
         if (!result && resultId) {
             const fetchResult = async () => {
                 try {
                     setLoading(true);
-                    // Здесь нужен API для получения одного результата по ID
-                    // Пример: const response = await TestService.getResultById(resultId);
-                    // setResult(response.data);
+                    // Try to use the specific API endpoint if available
+                    try {
+                        const response = await TestService.getResultById(resultId);
+                        setResult(response.data);
+                    } catch (err) {
+                        // Fallback to getting all results and finding the right one
+                        const response = await TestService.getStudentResults();
+                        const foundResult = response.data.find(r => r.id === parseInt(resultId));
 
-                    // Пока такого API нет, используем загрузку всех результатов студента
-                    const response = await TestService.getStudentResults();
-                    const foundResult = response.data.find(r => r.id === parseInt(resultId));
-
-                    if (foundResult) {
-                        setResult(foundResult);
-                    } else {
-                        setError("Результат не найден");
+                        if (foundResult) {
+                            setResult(foundResult);
+                        } else {
+                            setError("Результат не найден");
+                        }
                     }
                 } catch (err) {
                     setError("Ошибка при загрузке результата: " + (err.response?.data?.message || err.message));
@@ -45,10 +47,27 @@ const TestResult = () => {
     if (error) return <div className="error-message">{error}</div>;
     if (!result) return <div>Результат не найден</div>;
 
-    // Расчет процента правильных ответов
+    // Calculate time spent if startedAt and completedAt are available
+    const calculateTimeSpent = () => {
+        if (result.startedAt && result.completedAt) {
+            const start = new Date(result.startedAt);
+            const end = new Date(result.completedAt);
+            const diffSeconds = Math.floor((end - start) / 1000);
+            return diffSeconds;
+        }
+        return null;
+    };
+
+    const timeSpent = result.timeSpent || calculateTimeSpent();
+
+    // Use score and maxScore from the result
+    const score = result.score || 0;
+    const maxScore = result.maxScore || 0;
+
+    // Calculate percentage based on score and maxScore
     const calculatePercentage = () => {
-        if (result.totalQuestions === 0) return 0;
-        return Math.round((result.correctAnswers / result.totalQuestions) * 100);
+        if (!maxScore || maxScore === 0) return 0;
+        return Math.round((score / maxScore) * 100);
     };
 
     // Определение статуса прохождения
@@ -61,6 +80,8 @@ const TestResult = () => {
     };
 
     const statusInfo = getStatusClass();
+    const completedAt = result.completedAt ? new Date(result.completedAt) : null;
+    const testTitle = result.testTitle || result.test?.title || "Тест";
 
     return (
         <div>
@@ -73,30 +94,30 @@ const TestResult = () => {
                 boxShadow: '0 0 10px rgba(0,0,0,0.1)',
                 marginBottom: '1.5rem'
             }}>
-                <h3 style={{ marginBottom: '1.5rem' }}>{result.testTitle}</h3>
+                <h3 style={{ marginBottom: '1.5rem' }}>{testTitle}</h3>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
                     <div><strong>Дата прохождения:</strong></div>
-                    <div>{new Date(result.completedAt).toLocaleString()}</div>
+                    <div>{completedAt ? completedAt.toLocaleString() : 'Не указано'}</div>
 
                     <div><strong>Затраченное время:</strong></div>
-                    <div>{result.timeSpent ? `${Math.floor(result.timeSpent / 60)} мин ${result.timeSpent % 60} сек` : 'Не указано'}</div>
+                    <div>{timeSpent ? `${Math.floor(timeSpent / 60)} мин ${timeSpent % 60} сек` : 'Не указано'}</div>
 
-                    <div><strong>Всего вопросов:</strong></div>
-                    <div>{result.totalQuestions}</div>
+                    <div><strong>Всего балов:</strong></div>
+                    <div>{maxScore}</div>
 
-                    <div><strong>Правильных ответов:</strong></div>
-                    <div>{result.correctAnswers}</div>
+                    <div><strong>Набрано балов:</strong></div>
+                    <div>{score}</div>
 
                     <div><strong>Процент выполнения:</strong></div>
-                    <div>{calculatePercentage()}%</div>
+                    <div>{maxScore > 0 ? `${calculatePercentage()}%` : 'Не указано'}</div>
 
                     <div><strong>Результат:</strong></div>
                     <div style={{ color: statusInfo.color, fontWeight: 'bold' }}>{statusInfo.text}</div>
                 </div>
             </div>
 
-            {result.questionResults && (
+            {result.questionResults && result.questionResults.length > 0 && (
                 <div>
                     <h3>Детали ответов</h3>
 
@@ -113,14 +134,15 @@ const TestResult = () => {
                             }}
                         >
                             <h4 style={{ marginBottom: '1rem' }}>
-                                Вопрос {index + 1}: {qResult.questionText}
+                                Вопрос {index + 1}: {qResult.questionText || 'Текст вопроса не доступен'}
                             </h4>
 
                             <div>
-                                <strong>Ваш ответ:</strong> {qResult.userAnswers.join(', ')}
+                                <strong>Ваш ответ:</strong> {(qResult.userAnswers && qResult.userAnswers.length) ?
+                                qResult.userAnswers.join(', ') : 'Не указан'}
                             </div>
 
-                            {!qResult.correct && (
+                            {!qResult.correct && qResult.correctAnswers && (
                                 <div style={{ marginTop: '0.5rem' }}>
                                     <strong>Правильный ответ:</strong> {qResult.correctAnswers.join(', ')}
                                 </div>
@@ -140,7 +162,7 @@ const TestResult = () => {
                 </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.5rem' }}>
                 <button
                     onClick={() => navigate('/tests')}
                     style={{

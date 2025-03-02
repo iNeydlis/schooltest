@@ -69,6 +69,15 @@ const App = () => {
                             }
                         />
 
+                        {/* Alternative path for taking tests */}
+                        <Route
+                            path="/tests/:testId/take"
+                            element={
+                                user && user.role === 'STUDENT' ?
+                                    <TestTaking /> : <Navigate to="/tests" />
+                            }
+                        />
+
                         {/* Результат теста: только для студентов */}
                         <Route
                             path="/tests/result/:resultId"

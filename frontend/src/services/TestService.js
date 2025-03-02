@@ -1,12 +1,17 @@
 import api from './api';
 
 class TestService {
+    // Test management methods
     getAllTests() {
         return api.get(`/tests`);
     }
 
     getTestById(testId, includeAnswers = false) {
         return api.get(`/tests/${testId}?includeAnswers=${includeAnswers}`);
+    }
+
+    getTestQuestions(testId, testResultId) {
+        return api.get(`/tests/${testId}/questions?testResultId=${testResultId}`);
     }
 
     createTest(testData) {
@@ -34,6 +39,16 @@ class TestService {
     // Test results methods
     getTestResults(testId) {
         return api.get(`/tests/${testId}/results`);
+    }
+
+    // Get all test results for the current student
+    getStudentResults() {
+        return api.get(`/student/results`);
+    }
+
+    // Get a specific test result by ID
+    getResultById(resultId) {
+        return api.get(`/results/${resultId}`);
     }
 
     startTest(testId) {

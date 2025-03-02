@@ -24,28 +24,39 @@ const TestTaking = () => {
 
                 // Получаем информацию о тесте
                 const testResponse = await TestService.getTestById(testId);
-                setTest(testResponse.data);
+                // Проверяем, возвращается ли ответ в поле data или напрямую
+                const testData = testResponse.data || testResponse;
+                setTest(testData);
 
                 // Начинаем тест
-                const startResponse = await TestService.startTest(testId);
-                setTestResult(startResponse.data);
+                const startResult = await TestService.startTest(testId);
+                // Проверяем, возвращается ли ответ в поле data или напрямую
+                const resultData = startResult.data || startResult;
+                setTestResult(resultData);
+
+                if (!resultData || !resultData.id) {
+                    throw new Error('Не удалось получить данные о результате теста');
+                }
 
                 // Загружаем вопросы
-                const questionsResponse = await TestService.getTestQuestions(testId, startResponse.data.id);
-                setQuestions(questionsResponse.data);
+                const questionsResponse = await TestService.getTestQuestions(testId, resultData.id);
+                // Проверяем, возвращается ли ответ в поле data или напрямую
+                const questionsData = questionsResponse.data || questionsResponse;
+                setQuestions(questionsData);
 
                 // Инициализируем объект с ответами пользователя
                 const initialAnswers = {};
-                questionsResponse.data.forEach(question => {
+                questionsData.forEach(question => {
                     initialAnswers[question.id] = question.type === 'MULTIPLE_CHOICE' ? [] : null;
                 });
                 setAnswers(initialAnswers);
 
                 // Устанавливаем время на тест
-                if (testResponse.data.timeLimit) {
-                    setTimeLeft(testResponse.data.timeLimit * 60); // Переводим минуты в секунды
+                if (testData.timeLimit) {
+                    setTimeLeft(testData.timeLimit * 60); // Переводим минуты в секунды
                 }
             } catch (err) {
+                console.error('Error in startTestSession:', err);
                 setError("Ошибка при загрузке теста: " + (err.response?.data?.message || err.message));
             } finally {
                 setLoading(false);
@@ -142,17 +153,20 @@ const TestTaking = () => {
                 testResultId: testResult.id,
                 answers: Object.entries(answers).map(([questionId, answer]) => ({
                     questionId: parseInt(questionId),
-                    answerIds: Array.isArray(answer) ? answer : [answer]
+                    selectedAnswerIds: Array.isArray(answer) ? answer : [answer].filter(id => id !== null)
                 }))
             };
 
             // Отправляем ответы
             const result = await TestService.submitTest(submissionData);
+            // Проверяем, возвращается ли ответ в поле data или напрямую
+            const resultData = result.data || result;
 
             // Переходим на страницу с результатом
-            navigate(`/tests/result/${result.data.id}`, { state: { result: result.data } });
+            navigate(`/tests/result/${resultData.id}`, { state: { result: resultData } });
 
         } catch (err) {
+            console.error('Error submitting test:', err);
             setError("Ошибка при отправке ответов: " + (err.response?.data?.message || err.message));
             setSubmitting(false);
         }
