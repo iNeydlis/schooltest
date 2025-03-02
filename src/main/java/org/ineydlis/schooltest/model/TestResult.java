@@ -42,6 +42,9 @@ public class TestResult {
 
     private Integer maxScore;
 
+    @Column(nullable = false)
+    private Integer attemptNumber = 1;
+
     @OneToMany(mappedBy = "testResult", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StudentAnswer> studentAnswers = new ArrayList<>();
 }

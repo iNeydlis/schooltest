@@ -65,6 +65,7 @@ const TestsList = () => {
                         <p><strong>Предмет:</strong> {test.subjectName?.name || test.subjectName || 'Не указан'}</p>
                         <p><strong>Описание:</strong> {test.description || 'Нет описания'}</p>
                         <p><strong>Вопросов:</strong> {test.questionCount || '0'}</p>
+                        <p><strong>Макс. попыток:</strong> {test.maxAttempts || '1'}</p>
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
                             {user?.role === 'STUDENT' ? (

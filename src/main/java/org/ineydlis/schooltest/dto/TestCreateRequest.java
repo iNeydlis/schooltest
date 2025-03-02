@@ -14,7 +14,8 @@ public class TestCreateRequest {
     private String title;
     private String description;
     private Long subjectId;
+    private List<Long> gradeIds;
     private Integer timeLimit;
-    private Set<Long> gradeIds;
     private List<QuestionDto> questions;
+    private Integer maxAttempts = 1; // Default to 1 attempt
 }

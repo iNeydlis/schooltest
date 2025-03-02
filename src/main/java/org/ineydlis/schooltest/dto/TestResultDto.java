@@ -13,32 +13,32 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TestResultDto {
+    // Existing fields
     private Long id;
     private Long testId;
     private String testTitle;
-    private String studentName;
     private Long studentId;
+    private String studentName;
     private LocalDateTime startedAt;
     private LocalDateTime completedAt;
     private boolean completed;
     private Integer score;
     private Integer maxScore;
-    private String grade; // If needed
+    private Integer attemptNumber; // Add this field
 
     public static TestResultDto fromEntity(TestResult result) {
         return TestResultDto.builder()
                 .id(result.getId())
                 .testId(result.getTest().getId())
                 .testTitle(result.getTest().getTitle())
-                .studentName(result.getStudent().getFullName())
                 .studentId(result.getStudent().getId())
+                .studentName(result.getStudent().getFullName())
                 .startedAt(result.getStartedAt())
                 .completedAt(result.getCompletedAt())
                 .completed(result.isCompleted())
                 .score(result.getScore())
                 .maxScore(result.getMaxScore())
-                .grade(result.getStudent().getGrade() != null ?
-                        result.getStudent().getGrade().getFullName() : null)
+                .attemptNumber(result.getAttemptNumber()) // Add this to the builder
                 .build();
     }
 }

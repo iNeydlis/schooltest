@@ -278,7 +278,6 @@ public class TestService {
         }
     }
 
-    // Start a test for student
     @Transactional
     public TestResultDto startTest(Long testId, Long studentId) {
         Test test = testRepository.findById(testId)
@@ -301,12 +300,30 @@ public class TestService {
             throw new RuntimeException("Тест неактивен");
         }
 
-        // Check if student has already started this test
-        Optional<TestResult> existingTestResult =
+        // Check attempt limits first, regardless of existing attempts
+        List<TestResult> completedAttempts = testResultRepository.findByTestAndStudentAndCompleted(
+                test, student, true);
+
+        if (completedAttempts.size() >= test.getMaxAttempts()) {
+            // Check if the student has an ongoing attempt
+            Optional<TestResult> existingIncompleteTest =
+                    testResultRepository.findByTestAndStudentAndCompletedFalse(test, student);
+
+            // Delete any incomplete attempts if limit is exceeded
+            if (existingIncompleteTest.isPresent()) {
+                testResultRepository.delete(existingIncompleteTest.get());
+            }
+
+            throw new RuntimeException("Вы достигли максимального количества попыток (" +
+                    test.getMaxAttempts() + ") для этого теста");
+        }
+
+        // Check if the student has an ongoing attempt
+        Optional<TestResult> existingIncompleteTest =
                 testResultRepository.findByTestAndStudentAndCompletedFalse(test, student);
 
-        if (existingTestResult.isPresent()) {
-            return TestResultDto.fromEntity(existingTestResult.get());
+        if (existingIncompleteTest.isPresent()) {
+            return TestResultDto.fromEntity(existingIncompleteTest.get());
         }
 
         // Create new test result
@@ -315,6 +332,7 @@ public class TestService {
         testResult.setStudent(student);
         testResult.setStartedAt(LocalDateTime.now());
         testResult.setCompleted(false);
+        testResult.setAttemptNumber(completedAttempts.size() + 1);
         testResult.setMaxScore(test.getQuestions().stream()
                 .mapToInt(Question::getPoints)
                 .sum());

@@ -18,4 +18,5 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
     Optional<TestResult> findByTestAndStudentAndCompletedFalse(Test test, User student);
 
     List<TestResult> findByTestAndCompleted(Test test, boolean completed);
+    List<TestResult> findByTestAndStudentAndCompleted(Test test, User student, boolean completed);
 }

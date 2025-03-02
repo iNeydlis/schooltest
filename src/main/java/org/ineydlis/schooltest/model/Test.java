@@ -46,6 +46,9 @@ public class Test {
     @Column(nullable = false)
     private boolean isActive = true;
 
+    @Column(nullable = false)
+    private Integer maxAttempts = 1; // Default to 1 attempt
+
     // Grades that can access this test
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(

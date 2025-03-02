@@ -10,7 +10,6 @@ import org.ineydlis.schooltest.model.Test;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.stream.Collectors;
-
 @Data
 @Builder
 @NoArgsConstructor
@@ -30,6 +29,8 @@ public class TestDto {
     private Set<String> availableGrades;
     private Integer questionCount;
     private Integer totalPoints;
+    private Integer maxAttempts; // New field for attempt limits
+
 
     public static TestDto fromEntity(Test test) {
         return TestDto.builder()
@@ -51,8 +52,7 @@ public class TestDto {
                 .totalPoints(test.getQuestions().stream()
                         .mapToInt(q -> q.getPoints())
                         .sum())
+                .maxAttempts(test.getMaxAttempts()) // Add this field to the builder
                 .build();
     }
 }
-
-
