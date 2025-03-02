@@ -29,12 +29,6 @@ public class AuthService {
     private UserRepository userRepository;
 
     @Autowired
-    private GradeRepository gradeRepository;
-
-    @Autowired
-    private SubjectRepository subjectRepository;
-
-    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Transactional
@@ -96,46 +90,7 @@ public class AuthService {
         }
     }
 
-    @Transactional
-    public User createUser(UserDto userDto) {
-        if (userRepository.existsByUsername(userDto.getUsername())) {
-            throw new RuntimeException("Пользователь с таким именем уже существует");
-        }
 
-        User user = new User();
-        user.setUsername(userDto.getUsername());
-        user.setPassword(passwordEncoder.encode(userDto.getPassword()));
-        user.setFullName(userDto.getFullName());
-        user.setEmail(userDto.getEmail());
-        user.setRole(userDto.getRole());
-        user.setActive(true);
-
-        // Устанавливаем класс для ученика
-        if (userDto.getRole() == UserRole.STUDENT && userDto.getGradeName() != null) {
-            Optional<Grade> gradeOpt = gradeRepository.findByFullName(userDto.getGradeName());
-            if (gradeOpt.isPresent()) {
-                user.setGrade(gradeOpt.get());
-            } else {
-                throw new RuntimeException("Указанный класс не найден: " + userDto.getGradeName());
-            }
-        }
-
-        // Устанавливаем предметы для учителя
-        if (userDto.getRole() == UserRole.TEACHER && userDto.getSubjectNames() != null) {
-            Set<Subject> subjects = new HashSet<>();
-            for (String subjectName : userDto.getSubjectNames()) {
-                Optional<Subject> subjectOpt = subjectRepository.findByName(subjectName);
-                if (subjectOpt.isPresent()) {
-                    subjects.add(subjectOpt.get());
-                } else {
-                    throw new RuntimeException("Указанный предмет не найден: " + subjectName);
-                }
-            }
-            user.setSubjects(subjects);
-        }
-
-        return userRepository.save(user);
-    }
 
     public String encodePassword(String rawPassword) {
         return passwordEncoder.encode(rawPassword);
