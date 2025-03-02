@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import TestService from '../services/TestService';
 
 const TestsList = () => {
-    const [tests, setTests] = useState([]);
+    const [tests, setTests] = useState([]); // Initialize with empty array
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { user } = useContext(AuthContext);
@@ -14,9 +14,12 @@ const TestsList = () => {
             try {
                 setLoading(true);
                 const response = await TestService.getAllTests();
-                setTests(response.data);
+                // The response is already the data due to your API interceptor
+                setTests(Array.isArray(response) ? response : []);
             } catch (err) {
-                setError("Ошибка при загрузке тестов: " + (err.response?.data?.message || err.message));
+                console.error("Error fetching tests:", err);
+                setError("Ошибка при загрузке тестов: " + (err.message || 'Произошла ошибка'));
+                setTests([]); // Ensure tests is always an array
             } finally {
                 setLoading(false);
             }
@@ -29,59 +32,58 @@ const TestsList = () => {
         if (window.confirm('Вы уверены, что хотите удалить этот тест?')) {
             try {
                 await TestService.deleteTest(testId);
-                setTests(tests.filter(test => test.id !== testId));
+                // Use the functional form of setState when depending on previous state
+                setTests(prevTests => prevTests.filter(test => test.id !== testId));
             } catch (err) {
-                setError("Ошибка при удалении теста: " + (err.response?.data?.message || err.message));
+                console.error("Error deleting test:", err);
+                setError("Ошибка при удалении теста: " + (err.message || 'Произошла ошибка'));
             }
         }
     };
 
-    if (loading) return <div>Загрузка тестов...</div>;
-    if (error) return <div className="error-message">{error}</div>;
+    // Add defensive programming - ensure tests is always treated as an array
+    const renderTests = () => {
+        const testsArray = Array.isArray(tests) ? tests : [];
 
-    return (
-        <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h2>Список тестов</h2>
-                {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
-                    <Link
-                        to="/tests/create"
+        if (testsArray.length === 0) {
+            return <p>Нет доступных тестов.</p>;
+        }
+
+        return (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+                {testsArray.map(test => (
+                    <div
+                        key={test.id}
                         style={{
-                            backgroundColor: '#4CAF50',
-                            color: 'white',
-                            padding: '0.5rem 1rem',
-                            borderRadius: '4px',
-                            textDecoration: 'none'
+                            backgroundColor: 'white',
+                            padding: '1rem',
+                            borderRadius: '8px',
+                            boxShadow: '0 0 10px rgba(0,0,0,0.1)'
                         }}
                     >
-                        Создать новый тест
-                    </Link>
-                )}
-            </div>
+                        <h3>{test.title}</h3>
+                        <p><strong>Предмет:</strong> {test.subjectName?.name || test.subjectName || 'Не указан'}</p>
+                        <p><strong>Описание:</strong> {test.description || 'Нет описания'}</p>
+                        <p><strong>Вопросов:</strong> {test.questionCount || '0'}</p>
 
-            {tests.length === 0 ? (
-                <p>Нет доступных тестов.</p>
-            ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-                    {tests.map(test => (
-                        <div
-                            key={test.id}
-                            style={{
-                                backgroundColor: 'white',
-                                padding: '1rem',
-                                borderRadius: '8px',
-                                boxShadow: '0 0 10px rgba(0,0,0,0.1)'
-                            }}
-                        >
-                            <h3>{test.title}</h3>
-                            <p><strong>Предмет:</strong> {test.subject}</p>
-                            <p><strong>Описание:</strong> {test.description || 'Нет описания'}</p>
-                            <p><strong>Вопросов:</strong> {test.questionCount || '0'}</p>
-
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-                                {user.role === 'STUDENT' ? (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
+                            {user?.role === 'STUDENT' ? (
+                                <Link
+                                    to={`/tests/${test.id}/take`}
+                                    style={{
+                                        backgroundColor: '#2196F3',
+                                        color: 'white',
+                                        padding: '0.5rem 1rem',
+                                        borderRadius: '4px',
+                                        textDecoration: 'none'
+                                    }}
+                                >
+                                    Пройти тест
+                                </Link>
+                            ) : (
+                                <>
                                     <Link
-                                        to={`/tests/${test.id}/start`}
+                                        to={`/tests/${test.id}/results`}
                                         style={{
                                             backgroundColor: '#2196F3',
                                             color: 'white',
@@ -90,24 +92,8 @@ const TestsList = () => {
                                             textDecoration: 'none'
                                         }}
                                     >
-                                        Начать тест
+                                        Результаты
                                     </Link>
-                                ) : (
-                                    <Link
-                                        to={`/tests/${test.id}`}
-                                        style={{
-                                            backgroundColor: '#2196F3',
-                                            color: 'white',
-                                            padding: '0.5rem 1rem',
-                                            borderRadius: '4px',
-                                            textDecoration: 'none'
-                                        }}
-                                    >
-                                        Просмотр
-                                    </Link>
-                                )}
-
-                                {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
                                     <div>
                                         <Link
                                             to={`/tests/${test.id}/edit`}
@@ -136,27 +122,39 @@ const TestsList = () => {
                                             Удалить
                                         </button>
                                     </div>
-                                )}
-
-                                {(user.role === 'TEACHER' || user.role === 'ADMIN') && (
-                                    <Link
-                                        to={`/tests/${test.id}/results`}
-                                        style={{
-                                            backgroundColor: '#9C27B0',
-                                            color: 'white',
-                                            padding: '0.5rem 1rem',
-                                            borderRadius: '4px',
-                                            textDecoration: 'none'
-                                        }}
-                                    >
-                                        Результаты
-                                    </Link>
-                                )}
-                            </div>
+                                </>
+                            )}
                         </div>
-                    ))}
-                </div>
-            )}
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
+    if (loading) return <div>Загрузка тестов...</div>;
+    if (error) return <div className="error-message">{error}</div>;
+
+    return (
+        <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h2>Список тестов</h2>
+                {(user?.role === 'TEACHER' || user?.role === 'ADMIN') && (
+                    <Link
+                        to="/tests/create"
+                        style={{
+                            backgroundColor: '#4CAF50',
+                            color: 'white',
+                            padding: '0.5rem 1rem',
+                            borderRadius: '4px',
+                            textDecoration: 'none'
+                        }}
+                    >
+                        Создать новый тест
+                    </Link>
+                )}
+            </div>
+
+            {renderTests()}
         </div>
     );
 };

@@ -1,54 +1,47 @@
 import api from './api';
 
 class TestService {
-    // Получение списка всех тестов
-    async getAllTests() {
-        return api.get('/tests');
+    getAllTests() {
+        return api.get(`/tests`);
     }
 
-    // Получение конкретного теста по ID
-    async getTestById(testId, includeAnswers = false) {
+    getTestById(testId, includeAnswers = false) {
         return api.get(`/tests/${testId}?includeAnswers=${includeAnswers}`);
     }
 
-    // Создание нового теста
-    async createTest(testData) {
-        return api.post('/tests', testData);
+    createTest(testData) {
+        return api.post(`/tests`, testData);
     }
 
-    // Обновление существующего теста
-    async updateTest(testId, testData) {
+    updateTest(testId, testData) {
         return api.put(`/tests/${testId}`, testData);
     }
 
-    // Удаление теста
-    async deleteTest(testId) {
+    deleteTest(testId) {
         return api.delete(`/tests/${testId}`);
     }
 
-    // Начать прохождение теста (для студентов)
-    async startTest(testId) {
+    // Subject-related methods
+    getAllSubjects() {
+        return api.get(`/subjects`);
+    }
+
+    // Grade-related methods
+    getAllGrades() {
+        return api.get(`/grades`);
+    }
+
+    // Test results methods
+    getTestResults(testId) {
+        return api.get(`/tests/${testId}/results`);
+    }
+
+    startTest(testId) {
         return api.post(`/tests/${testId}/start`);
     }
 
-    // Получить вопросы для теста
-    async getTestQuestions(testId, testResultId) {
-        return api.get(`/tests/${testId}/questions?testResultId=${testResultId}`);
-    }
-
-    // Отправка ответов на тест
-    async submitTest(submissionData) {
-        return api.post('/tests/submit', submissionData);
-    }
-
-    // Получение результатов студента
-    async getStudentResults() {
-        return api.get('/tests/results');
-    }
-
-    // Получение результатов для конкретного теста (для учителей)
-    async getTestResults(testId) {
-        return api.get(`/tests/${testId}/results`);
+    submitTest(submissionData) {
+        return api.post(`/tests/submit`, submissionData);
     }
 }
 

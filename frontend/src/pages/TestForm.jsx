@@ -9,14 +9,39 @@ const TestForm = () => {
 
     const [formData, setFormData] = useState({
         title: '',
-        subject: '',
         description: '',
+        subjectId: '',
         timeLimit: 60,
+        gradeIds: [],
         questions: []
     });
 
+    const [subjects, setSubjects] = useState([]);
+    const [grades, setGrades] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    useEffect(() => {
+        const fetchSubjectsAndGrades = async () => {
+            try {
+                setLoading(true);
+                const [subjectsResponse, gradesResponse] = await Promise.all([
+                    TestService.getAllSubjects(),
+                    TestService.getAllGrades()
+                ]);
+                setSubjects(subjectsResponse); // Changed from subjectsResponse.data
+                setGrades(gradesResponse);     // Changed from gradesResponse.data
+            } catch (err) {
+                setError("Ошибка при загрузке данных: " + (err.message || 'Произошла ошибка'));
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSubjectsAndGrades();
+    }, []);
+
+    // Rest of the component remains the same...
 
     useEffect(() => {
         if (isEditing) {
@@ -26,9 +51,10 @@ const TestForm = () => {
                     const response = await TestService.getTestById(testId, true);
                     setFormData({
                         title: response.data.title,
-                        subject: response.data.subject,
                         description: response.data.description || '',
+                        subjectId: response.data.subject.id,
                         timeLimit: response.data.timeLimit || 60,
+                        gradeIds: response.data.availableGrades.map(grade => grade.id),
                         questions: response.data.questions || []
                     });
                 } catch (err) {
@@ -48,6 +74,26 @@ const TestForm = () => {
             ...prev,
             [name]: value
         }));
+    };
+
+    const handleGradeChange = (e) => {
+        const gradeId = parseInt(e.target.value);
+        const isChecked = e.target.checked;
+
+        setFormData(prev => {
+            let updatedGradeIds = [...prev.gradeIds];
+
+            if (isChecked && !updatedGradeIds.includes(gradeId)) {
+                updatedGradeIds.push(gradeId);
+            } else if (!isChecked) {
+                updatedGradeIds = updatedGradeIds.filter(id => id !== gradeId);
+            }
+
+            return {
+                ...prev,
+                gradeIds: updatedGradeIds
+            };
+        });
     };
 
     const handleQuestionChange = (index, field, value) => {
@@ -82,9 +128,10 @@ const TestForm = () => {
                 {
                     text: '',
                     type: 'SINGLE_CHOICE',
+                    points: 1,
                     answers: [
-                        { text: '', correct: true },
-                        { text: '', correct: false }
+                        { text: '', isCorrect: true },
+                        { text: '', isCorrect: false }
                     ]
                 }
             ]
@@ -104,7 +151,7 @@ const TestForm = () => {
         const updatedQuestions = [...formData.questions];
         updatedQuestions[questionIndex].answers.push({
             text: '',
-            correct: false
+            isCorrect: false
         });
         setFormData(prev => ({
             ...prev,
@@ -128,13 +175,17 @@ const TestForm = () => {
             setLoading(true);
             setError(null);
 
-            // Проверка валидности формы
+            // Form validation
             if (!formData.title.trim()) {
                 throw new Error('Название теста обязательно');
             }
 
-            if (!formData.subject.trim()) {
+            if (!formData.subjectId) {
                 throw new Error('Предмет обязателен');
+            }
+
+            if (formData.gradeIds.length === 0) {
+                throw new Error('Выберите хотя бы один класс');
             }
 
             if (formData.questions.length === 0) {
@@ -150,7 +201,7 @@ const TestForm = () => {
                     throw new Error(`Вопрос #${qIndex + 1} должен содержать хотя бы два варианта ответа`);
                 }
 
-                const hasCorrectAnswer = question.answers.some(answer => answer.correct);
+                const hasCorrectAnswer = question.answers.some(answer => answer.isCorrect);
                 if (!hasCorrectAnswer) {
                     throw new Error(`Вопрос #${qIndex + 1} должен иметь хотя бы один правильный ответ`);
                 }
@@ -164,15 +215,17 @@ const TestForm = () => {
 
             const testCreateRequest = {
                 title: formData.title,
-                subject: formData.subject,
+                subjectId: parseInt(formData.subjectId),
                 description: formData.description,
                 timeLimit: parseInt(formData.timeLimit),
+                gradeIds: formData.gradeIds,
                 questions: formData.questions.map(q => ({
                     text: q.text,
                     type: q.type,
+                    points: parseInt(q.points) || 1,
                     answers: q.answers.map(a => ({
                         text: a.text,
-                        correct: a.correct
+                        isCorrect: a.isCorrect
                     }))
                 }))
             };
@@ -230,15 +283,21 @@ const TestForm = () => {
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="subject">Предмет *</label>
-                        <input
-                            id="subject"
-                            name="subject"
-                            type="text"
-                            value={formData.subject}
+                        <label htmlFor="subjectId">Предмет *</label>
+                        <select
+                            id="subjectId"
+                            name="subjectId"
+                            value={formData.subjectId}
                             onChange={handleChange}
                             required
-                        />
+                        >
+                            <option value="">Выберите предмет</option>
+                            {subjects.map(subject => (
+                                <option key={subject.id} value={subject.id}>
+                                    {subject.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
                     <div className="form-group">
@@ -262,6 +321,25 @@ const TestForm = () => {
                             value={formData.timeLimit}
                             onChange={handleChange}
                         />
+                    </div>
+
+                    <div className="form-group">
+                        <label>Доступно для классов *</label>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '8px' }}>
+                            {grades.map(grade => (
+                                <div key={grade.id} style={{ minWidth: '100px' }}>
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            value={grade.id}
+                                            checked={formData.gradeIds.includes(grade.id)}
+                                            onChange={handleGradeChange}
+                                        />
+                                        {grade.name}
+                                    </label>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -317,98 +395,137 @@ const TestForm = () => {
                                 >
                                     <option value="SINGLE_CHOICE">Один вариант ответа</option>
                                     <option value="MULTIPLE_CHOICE">Несколько вариантов ответа</option>
+                                    <option value="TEXT_ANSWER">Текстовый ответ</option>
                                 </select>
                             </div>
 
-                            <div style={{ marginTop: '1rem' }}>
-                                <h5>Варианты ответов</h5>
+                            <div className="form-group">
+                                <label htmlFor={`question-points-${qIndex}`}>Количество баллов</label>
+                                <input
+                                    id={`question-points-${qIndex}`}
+                                    type="number"
+                                    min="1"
+                                    value={question.points || 1}
+                                    onChange={(e) => handleQuestionChange(qIndex, 'points', e.target.value)}
+                                />
+                            </div>
 
-                                {question.answers.map((answer, aIndex) => (
-                                    <div
-                                        key={aIndex}
+                            {question.type !== 'TEXT_ANSWER' ? (
+                                <div style={{ marginTop: '1rem' }}>
+                                    <h5>Варианты ответов</h5>
+
+                                    {question.answers.map((answer, aIndex) => (
+                                        <div
+                                            key={aIndex}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                marginBottom: '0.5rem',
+                                                padding: '0.5rem',
+                                                backgroundColor: '#f9f9f9',
+                                                borderRadius: '4px'
+                                            }}
+                                        >
+                                            <div style={{ flex: 1 }}>
+                                                <input
+                                                    type="text"
+                                                    value={answer.text}
+                                                    onChange={(e) => handleAnswerChange(qIndex, aIndex, 'text', e.target.value)}
+                                                    placeholder="Текст ответа"
+                                                    required
+                                                    style={{ width: '100%' }}
+                                                />
+                                            </div>
+
+                                            <div style={{ display: 'flex', alignItems: 'center', marginLeft: '1rem' }}>
+                                                <label style={{ marginRight: '0.5rem' }}>
+                                                    <input
+                                                        type={question.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'}
+                                                        name={`correct-answer-${qIndex}`}
+                                                        checked={answer.isCorrect}
+                                                        onChange={(e) => {
+                                                            if (question.type === 'SINGLE_CHOICE') {
+                                                                // Reset all answers to false first
+                                                                const updatedQuestions = [...formData.questions];
+                                                                updatedQuestions[qIndex].answers.forEach((a, i) => {
+                                                                    a.isCorrect = false;
+                                                                });
+                                                                updatedQuestions[qIndex].answers[aIndex].isCorrect = true;
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    questions: updatedQuestions
+                                                                }));
+                                                            } else {
+                                                                // Just toggle the checkbox
+                                                                handleAnswerChange(qIndex, aIndex, 'isCorrect', e.target.checked);
+                                                            }
+                                                        }}
+                                                    />
+                                                    Правильный
+                                                </label>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeAnswer(qIndex, aIndex)}
+                                                    style={{
+                                                        backgroundColor: '#F44336',
+                                                        color: 'white',
+                                                        padding: '0.25rem 0.5rem',
+                                                        borderRadius: '4px',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        fontSize: '0.8rem'
+                                                    }}
+                                                    disabled={question.answers.length <= 2}
+                                                >
+                                                    Удалить
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => addAnswer(qIndex)}
                                         style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            marginBottom: '0.5rem',
+                                            backgroundColor: '#2196F3',
+                                            color: 'white',
                                             padding: '0.5rem',
-                                            backgroundColor: '#f9f9f9',
-                                            borderRadius: '4px'
+                                            borderRadius: '4px',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            marginTop: '0.5rem'
                                         }}
                                     >
-                                        <div style={{ flex: 1 }}>
-                                            <input
-                                                type="text"
-                                                value={answer.text}
-                                                onChange={(e) => handleAnswerChange(qIndex, aIndex, 'text', e.target.value)}
-                                                placeholder="Текст ответа"
-                                                required
-                                                style={{ width: '100%' }}
-                                            />
-                                        </div>
-
-                                        <div style={{ display: 'flex', alignItems: 'center', marginLeft: '1rem' }}>
-                                            <label style={{ marginRight: '0.5rem' }}>
-                                                <input
-                                                    type={question.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'}
-                                                    name={`correct-answer-${qIndex}`}
-                                                    checked={answer.correct}
-                                                    onChange={(e) => {
-                                                        if (question.type === 'SINGLE_CHOICE') {
-                                                            // Для радиокнопок сначала сбрасываем все на false
-                                                            const updatedQuestions = [...formData.questions];
-                                                            updatedQuestions[qIndex].answers.forEach((a, i) => {
-                                                                a.correct = false;
-                                                            });
-                                                            updatedQuestions[qIndex].answers[aIndex].correct = true;
-                                                            setFormData(prev => ({
-                                                                ...prev,
-                                                                questions: updatedQuestions
-                                                            }));
-                                                        } else {
-                                                            // Для чекбоксов просто меняем значение
-                                                            handleAnswerChange(qIndex, aIndex, 'correct', e.target.checked);
-                                                        }
-                                                    }}
-                                                />
-                                                Правильный
-                                            </label>
-
-                                            <button
-                                                type="button"
-                                                onClick={() => removeAnswer(qIndex, aIndex)}
-                                                style={{
-                                                    backgroundColor: '#F44336',
-                                                    color: 'white',
-                                                    padding: '0.25rem 0.5rem',
-                                                    borderRadius: '4px',
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    fontSize: '0.8rem'
-                                                }}
-                                                disabled={question.answers.length <= 2}
-                                            >
-                                                Удалить
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                <button
-                                    type="button"
-                                    onClick={() => addAnswer(qIndex)}
-                                    style={{
-                                        backgroundColor: '#2196F3',
-                                        color: 'white',
-                                        padding: '0.5rem',
-                                        borderRadius: '4px',
-                                        border: 'none',
-                                        cursor: 'pointer',
-                                        marginTop: '0.5rem'
-                                    }}
-                                >
-                                    Добавить вариант ответа
-                                </button>
-                            </div>
+                                        Добавить вариант ответа
+                                    </button>
+                                </div>
+                            ) : (
+                                <div style={{ marginTop: '1rem' }}>
+                                    <h5>Правильный ответ</h5>
+                                    <input
+                                        type="text"
+                                        value={question.answers?.[0]?.text || ''}
+                                        onChange={(e) => {
+                                            const updatedQuestions = [...formData.questions];
+                                            if (!updatedQuestions[qIndex].answers || updatedQuestions[qIndex].answers.length === 0) {
+                                                updatedQuestions[qIndex].answers = [{ text: '', isCorrect: true }];
+                                            }
+                                            updatedQuestions[qIndex].answers[0].text = e.target.value;
+                                            updatedQuestions[qIndex].answers[0].isCorrect = true;
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                questions: updatedQuestions
+                                            }));
+                                        }}
+                                        placeholder="Введите правильный ответ"
+                                        style={{ width: '100%' }}
+                                    />
+                                    <p style={{ marginTop: '0.5rem', color: '#666', fontSize: '0.9rem' }}>
+                                        Ответ студента будет проверяться на точное соответствие (без учета регистра)
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     ))}
 
