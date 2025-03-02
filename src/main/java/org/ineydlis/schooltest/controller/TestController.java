@@ -138,6 +138,19 @@ public class TestController {
                 testId, testResultId, currentUser.getId());
         return ResponseEntity.ok(questions);
     }
+    @GetMapping("/{testId}/in-progress")
+    public ResponseEntity<TestResultDto> getInProgressTest(
+            @PathVariable Long testId,
+            @RequestHeader("Authorization") String token) {
+        User currentUser = getCurrentUser(token);
+
+        if (currentUser.getRole() != UserRole.STUDENT) {
+            throw new RuntimeException("Только ученики могут получить информацию о незавершенном тесте");
+        }
+
+        TestResultDto testResult = testService.getInProgressTest(testId, currentUser.getId());
+        return ResponseEntity.ok(testResult);
+    }
 
     // Start a test (for students)
     @PostMapping("/{testId}/start")

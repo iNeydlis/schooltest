@@ -118,7 +118,6 @@ public class TestService {
                 .collect(Collectors.toList());
     }
 
-    // Get tests available for a student
     public List<TestDto> getTestsForStudent(Long studentId) {
         User student = userRepository.findById(studentId)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
@@ -131,9 +130,37 @@ public class TestService {
             return Collections.emptyList();
         }
 
-        return testRepository.findByAvailableGradesAndActive(student.getGrade()).stream()
-                .map(TestDto::fromEntity)
-                .collect(Collectors.toList());
+        List<Test> tests = testRepository.findByAvailableGradesAndActive(student.getGrade());
+        List<TestDto> testDtos = new ArrayList<>();
+
+        for (Test test : tests) {
+            TestDto testDto = TestDto.fromEntity(test);
+
+            // Найдем все попытки для этого теста и этого ученика
+            List<TestResult> attempts = testResultRepository.findByTestAndStudent(test, student);
+
+            // Вычислим лучший результат
+            OptionalInt bestScore = attempts.stream()
+                    .filter(TestResult::isCompleted)
+                    .mapToInt(TestResult::getScore)
+                    .max();
+
+            if (bestScore.isPresent()) {
+                testDto.setBestScore(bestScore.getAsInt());
+            }
+
+            // Вычислим кол-во оставшихся попыток
+            long completedAttempts = attempts.stream()
+                    .filter(TestResult::isCompleted)
+                    .count();
+
+            int remainingAttempts = test.getMaxAttempts() - (int)completedAttempts;
+            testDto.setRemainingAttempts(Math.max(0, remainingAttempts));
+
+            testDtos.add(testDto);
+        }
+
+        return testDtos;
     }
 
     // Get test details with questions
@@ -278,6 +305,30 @@ public class TestService {
         }
     }
 
+    public TestResultDto getInProgressTest(Long testId, Long studentId) {
+        Test test = testRepository.findById(testId)
+                .orElseThrow(() -> new RuntimeException("Тест не найден"));
+
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        if (student.getRole() != UserRole.STUDENT) {
+            throw new RuntimeException("Только ученики могут проходить тесты");
+        }
+
+        // Check if the student has an ongoing attempt
+        Optional<TestResult> existingIncompleteTest =
+                testResultRepository.findByTestAndStudentAndCompletedFalse(test, student);
+
+        if (existingIncompleteTest.isPresent()) {
+            return TestResultDto.fromEntity(existingIncompleteTest.get());
+        }
+
+        // Return null if no in-progress test found
+        return null;
+    }
+
+    // Fix the startTest method to handle the unique result issue
     @Transactional
     public TestResultDto startTest(Long testId, Long studentId) {
         Test test = testRepository.findById(testId)
@@ -300,30 +351,35 @@ public class TestService {
             throw new RuntimeException("Тест неактивен");
         }
 
-        // Check attempt limits first, regardless of existing attempts
+        // Check attempt limits first
         List<TestResult> completedAttempts = testResultRepository.findByTestAndStudentAndCompleted(
                 test, student, true);
 
         if (completedAttempts.size() >= test.getMaxAttempts()) {
-            // Check if the student has an ongoing attempt
-            Optional<TestResult> existingIncompleteTest =
-                    testResultRepository.findByTestAndStudentAndCompletedFalse(test, student);
-
-            // Delete any incomplete attempts if limit is exceeded
-            if (existingIncompleteTest.isPresent()) {
-                testResultRepository.delete(existingIncompleteTest.get());
-            }
-
             throw new RuntimeException("Вы достигли максимального количества попыток (" +
                     test.getMaxAttempts() + ") для этого теста");
         }
 
         // Check if the student has an ongoing attempt
-        Optional<TestResult> existingIncompleteTest =
-                testResultRepository.findByTestAndStudentAndCompletedFalse(test, student);
+        List<TestResult> incompleteAttempts =
+                testResultRepository.findByTestAndStudentAndCompleted(test, student, false);
 
-        if (existingIncompleteTest.isPresent()) {
-            return TestResultDto.fromEntity(existingIncompleteTest.get());
+        // Fix for the "Query did not return a unique result: 2 results were returned" error
+        // If multiple incomplete attempts exist, keep only the most recent one
+        if (incompleteAttempts.size() > 1) {
+            // Sort by startedAt descending to get the most recent one
+            incompleteAttempts.sort((a, b) -> b.getStartedAt().compareTo(a.getStartedAt()));
+
+            // Keep the first one (most recent) and delete the rest
+            TestResult mostRecent = incompleteAttempts.get(0);
+            for (int i = 1; i < incompleteAttempts.size(); i++) {
+                testResultRepository.delete(incompleteAttempts.get(i));
+            }
+
+            return TestResultDto.fromEntity(mostRecent);
+        } else if (incompleteAttempts.size() == 1) {
+            // If only one incomplete attempt exists, return it
+            return TestResultDto.fromEntity(incompleteAttempts.get(0));
         }
 
         // Create new test result
@@ -381,17 +437,14 @@ public class TestService {
             throw new RuntimeException("Тест уже завершен");
         }
 
+        Test test = testResult.getTest();
+        boolean timeExpired = false;
+
         // Check if time limit exceeded
         LocalDateTime deadline = testResult.getStartedAt().plusMinutes(testResult.getTest().getTimeLimit());
         if (LocalDateTime.now().isAfter(deadline)) {
-            testResult.setCompleted(true);
-            testResult.setCompletedAt(LocalDateTime.now());
-            testResult.setScore(0); // Could be different logic, e.g., score what's been answered so far
-            testResultRepository.save(testResult);
-            throw new RuntimeException("Время выполнения теста истекло");
+            timeExpired = true;
         }
-
-        Test test = testResult.getTest();
 
         // Process student answers
         int totalScore = 0;
@@ -418,10 +471,10 @@ public class TestService {
                     studentAnswer.setTextAnswer(answerRequest.getTextAnswer());
 
                     // For text answers, we need custom logic to determine correctness
-                    // This could be exact match, contains, case insensitive, etc.
                     if (question.getAnswers().size() > 0) {
                         String correctAnswer = question.getAnswers().get(0).getText().trim().toLowerCase();
-                        String providedAnswer = answerRequest.getTextAnswer().trim().toLowerCase();
+                        String providedAnswer = answerRequest.getTextAnswer() != null ?
+                                answerRequest.getTextAnswer().trim().toLowerCase() : "";
                         isCorrect = correctAnswer.equals(providedAnswer);
                     }
                     break;
@@ -475,9 +528,15 @@ public class TestService {
         testResult.setScore(totalScore);
 
         TestResult savedResult = testResultRepository.save(testResult);
-        return TestResultDto.fromEntity(savedResult);
-    }
 
+        // If time expired, include a message in the result
+        TestResultDto resultDto = TestResultDto.fromEntity(savedResult);
+        if (timeExpired) {
+            resultDto.setMessage("Время выполнения теста истекло. Учтены только предоставленные ответы.");
+        }
+
+        return resultDto;
+    }
     // Get test results for a student
     public List<TestResultDto> getStudentResults(Long studentId) {
         User student = userRepository.findById(studentId)

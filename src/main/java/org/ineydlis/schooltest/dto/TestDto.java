@@ -1,4 +1,3 @@
-
 package org.ineydlis.schooltest.dto;
 
 import lombok.AllArgsConstructor;
@@ -10,6 +9,7 @@ import org.ineydlis.schooltest.model.Test;
 import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.stream.Collectors;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -29,8 +29,9 @@ public class TestDto {
     private Set<String> availableGrades;
     private Integer questionCount;
     private Integer totalPoints;
-    private Integer maxAttempts; // New field for attempt limits
-
+    private Integer maxAttempts;
+    private Integer bestScore; // Лучший результат ученика
+    private Integer remainingAttempts; // Оставшиеся попытки
 
     public static TestDto fromEntity(Test test) {
         return TestDto.builder()
@@ -52,7 +53,9 @@ public class TestDto {
                 .totalPoints(test.getQuestions().stream()
                         .mapToInt(q -> q.getPoints())
                         .sum())
-                .maxAttempts(test.getMaxAttempts()) // Add this field to the builder
+                .maxAttempts(test.getMaxAttempts())
+                .bestScore(null) // Значение по умолчанию или из другого источника
+                .remainingAttempts(null) // Значение по умолчанию или из другого источника
                 .build();
     }
 }

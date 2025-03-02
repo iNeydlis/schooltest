@@ -67,20 +67,60 @@ const TestsList = () => {
                         <p><strong>Вопросов:</strong> {test.questionCount || '0'}</p>
                         <p><strong>Макс. попыток:</strong> {test.maxAttempts || '1'}</p>
 
+                        {/* Добавленная информация для учеников */}
+                        {user?.role === 'STUDENT' && (
+                            <>
+                                {test.bestScore !== undefined && (
+                                    <p style={{ color: '#2E7D32' }}>
+                                        <strong>Лучший результат:</strong> {test.bestScore} из {test.maxScore || '?'} баллов
+                                    </p>
+                                )}
+                                {test.maxAttempts !== undefined && (
+                                    <p>
+                                        <strong>Попытки:</strong>
+                                        {test.remainingAttempts !== undefined
+                                            ? `${test.remainingAttempts} из ${test.maxAttempts}`
+                                            : `${test.maxAttempts} максимум`}
+                                    </p>
+                                )}
+                            </>
+                        )}
+
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
                             {user?.role === 'STUDENT' ? (
-                                <Link
-                                    to={`/tests/${test.id}/take`}
-                                    style={{
-                                        backgroundColor: '#2196F3',
-                                        color: 'white',
-                                        padding: '0.5rem 1rem',
-                                        borderRadius: '4px',
-                                        textDecoration: 'none'
-                                    }}
-                                >
-                                    Пройти тест
-                                </Link>
+                                <>
+                                    <Link
+                                        to={`/tests/${test.id}/take`}
+                                        style={{
+                                            backgroundColor: test.remainingAttempts > 0 ? '#2196F3' : '#9E9E9E',
+                                            color: 'white',
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '4px',
+                                            textDecoration: 'none',
+                                            cursor: test.remainingAttempts > 0 ? 'pointer' : 'not-allowed'
+                                        }}
+                                        onClick={(e) => {
+                                            if (test.remainingAttempts <= 0) {
+                                                e.preventDefault();
+                                                alert('У вас не осталось попыток для этого теста');
+                                            }
+                                        }}
+                                    >
+                                        {test.remainingAttempts > 0 ? 'Пройти тест' : 'Нет попыток'}
+                                    </Link>
+                                    <Link
+                                        to={`/tests/${test.id}/results`}
+                                        style={{
+                                            backgroundColor: test.bestScore !== undefined ? '#4CAF50' : '#9E9E9E',
+                                            color: 'white',
+                                            padding: '0.5rem 1rem',
+                                            borderRadius: '4px',
+                                            textDecoration: 'none'
+                                        }}
+                                    >
+                                        Мои результаты
+                                    </Link>
+                                </>
                             ) : (
                                 <>
                                     <Link

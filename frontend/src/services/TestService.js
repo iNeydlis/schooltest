@@ -51,8 +51,26 @@ class TestService {
         return api.get(`/results/${resultId}`);
     }
 
+    // Check if test is in progress and get the test result id
+    getInProgressTest(testId) {
+        return api.get(`/tests/${testId}/in-progress`);
+    }
+
     startTest(testId) {
-        return api.post(`/tests/${testId}/start`);
+        // First check if there's an in-progress test before starting a new one
+        return this.getInProgressTest(testId)
+            .then(response => {
+                // If there's an existing in-progress test, return it
+                if (response && response.id) {
+                    return response;
+                }
+                // Otherwise start a new test
+                return api.post(`/tests/${testId}/start`);
+            })
+            .catch(() => {
+                // If the endpoint doesn't exist or returns an error, fallback to original method
+                return api.post(`/tests/${testId}/start`);
+            });
     }
 
     submitTest(submissionData) {

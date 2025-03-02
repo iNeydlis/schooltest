@@ -24,7 +24,8 @@ public class TestResultDto {
     private boolean completed;
     private Integer score;
     private Integer maxScore;
-    private Integer attemptNumber; // Add this field
+    private Integer attemptNumber;
+    private String message; // Added message field
 
     public static TestResultDto fromEntity(TestResult result) {
         return TestResultDto.builder()

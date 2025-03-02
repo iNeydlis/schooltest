@@ -15,6 +15,7 @@ const TestTaking = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const [timeExpired, setTimeExpired] = useState(false);
 
     // Загрузка теста и начало прохождения
     useEffect(() => {
@@ -28,10 +29,40 @@ const TestTaking = () => {
                 const testData = testResponse.data || testResponse;
                 setTest(testData);
 
-                // Начинаем тест
-                const startResult = await TestService.startTest(testId);
-                // Проверяем, возвращается ли ответ в поле data или напрямую
-                const resultData = startResult.data || startResult;
+                // Сначала проверим, есть ли незавершенный тест
+                const inProgressResponse = await TestService.getInProgressTest(testId);
+                const inProgressData = inProgressResponse.data || inProgressResponse;
+
+                let resultData;
+                if (inProgressData && inProgressData.id) {
+                    // Если есть незавершенный тест, используем его
+                    resultData = inProgressData;
+
+                    // Вычисляем оставшееся время
+                    if (testData.timeLimit && resultData.startedAt) {
+                        const startTime = new Date(resultData.startedAt);
+                        const deadlineTime = new Date(startTime.getTime() + testData.timeLimit * 60 * 1000);
+                        const currentTime = new Date();
+                        const timeLeftMs = deadlineTime - currentTime;
+
+                        if (timeLeftMs > 0) {
+                            setTimeLeft(Math.floor(timeLeftMs / 1000)); // Конвертируем в секунды
+                        } else {
+                            setTimeExpired(true);
+                            setTimeLeft(0);
+                        }
+                    }
+                } else {
+                    // Иначе начинаем новый тест
+                    const startResult = await TestService.startTest(testId);
+                    resultData = startResult.data || startResult;
+
+                    // Устанавливаем время на тест
+                    if (testData.timeLimit) {
+                        setTimeLeft(testData.timeLimit * 60); // Переводим минуты в секунды
+                    }
+                }
+
                 setTestResult(resultData);
 
                 if (!resultData || !resultData.id) {
@@ -50,11 +81,6 @@ const TestTaking = () => {
                     initialAnswers[question.id] = question.type === 'MULTIPLE_CHOICE' ? [] : null;
                 });
                 setAnswers(initialAnswers);
-
-                // Устанавливаем время на тест
-                if (testData.timeLimit) {
-                    setTimeLeft(testData.timeLimit * 60); // Переводим минуты в секунды
-                }
             } catch (err) {
                 console.error('Error in startTestSession:', err);
                 setError("Ошибка при загрузке теста: " + (err.response?.data?.message || err.message));
@@ -74,8 +100,9 @@ const TestTaking = () => {
             setTimeLeft(prevTime => {
                 if (prevTime <= 1) {
                     clearInterval(timer);
+                    setTimeExpired(true);
                     // Автоматическая отправка теста при истечении времени
-                    handleSubmitTest();
+                    handleSubmitTest(true);
                     return 0;
                 }
                 return prevTime - 1;
@@ -87,6 +114,8 @@ const TestTaking = () => {
 
     // Обработчик ответа на вопрос
     const handleAnswerChange = (questionId, answerId, isMultiple = false) => {
+        if (timeExpired) return; // Не позволяем менять ответы после истечения времени
+
         if (isMultiple) {
             // Множественный выбор - добавляем/удаляем ID ответа из массива
             setAnswers(prev => {
@@ -128,7 +157,9 @@ const TestTaking = () => {
     };
 
     // Отправка ответов на тест
-    const handleSubmitTest = async () => {
+    const handleSubmitTest = async (isAutoSubmit = false) => {
+        if (submitting) return; // Предотвращаем повторную отправку
+
         try {
             setSubmitting(true);
 
@@ -141,7 +172,8 @@ const TestTaking = () => {
                 }
             });
 
-            if (unansweredQuestions.length > 0 && timeLeft > 0) {
+            // Если время не истекло и есть неотвеченные вопросы, показываем предупреждение
+            if (unansweredQuestions.length > 0 && !isAutoSubmit && !timeExpired) {
                 if (!window.confirm(`Вы не ответили на вопросы: ${unansweredQuestions.join(', ')}. Хотите отправить тест?`)) {
                     setSubmitting(false);
                     return;
@@ -153,7 +185,7 @@ const TestTaking = () => {
                 testResultId: testResult.id,
                 answers: Object.entries(answers).map(([questionId, answer]) => ({
                     questionId: parseInt(questionId),
-                    selectedAnswerIds: Array.isArray(answer) ? answer : [answer].filter(id => id !== null)
+                    selectedAnswerIds: Array.isArray(answer) ? answer : answer !== null ? [answer] : []
                 }))
             };
 
@@ -167,8 +199,16 @@ const TestTaking = () => {
 
         } catch (err) {
             console.error('Error submitting test:', err);
-            setError("Ошибка при отправке ответов: " + (err.response?.data?.message || err.message));
-            setSubmitting(false);
+            // Если время истекло, но тест все еще отправляется, пробуем отправить еще раз
+            if (err.response?.data?.message === "Время выполнения теста истекло" && !isAutoSubmit) {
+                setTimeExpired(true);
+                setTimeLeft(0);
+                // Повторно пытаемся отправить с флагом isAutoSubmit=true
+                handleSubmitTest(true);
+            } else {
+                setError("Ошибка при отправке ответов: " + (err.response?.data?.message || err.message));
+                setSubmitting(false);
+            }
         }
     };
 
@@ -188,9 +228,26 @@ const TestTaking = () => {
         return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     };
 
+    // Добавляем предупреждение об истекшем времени
+    const timeExpiredWarning = timeExpired ? (
+        <div style={{
+            backgroundColor: '#ffebee',
+            color: '#c62828',
+            padding: '1rem',
+            borderRadius: '4px',
+            marginBottom: '1rem',
+            fontWeight: 'bold',
+            textAlign: 'center'
+        }}>
+            Время выполнения теста истекло! Ваши ответы будут отправлены автоматически.
+        </div>
+    ) : null;
+
     return (
         <div>
             <h2>{test.title}</h2>
+
+            {timeExpiredWarning}
 
             <div style={{
                 display: 'flex',
@@ -208,9 +265,11 @@ const TestTaking = () => {
                 {timeLeft !== null && (
                     <div style={{
                         fontWeight: 'bold',
-                        color: timeLeft < 60 ? 'red' : 'inherit'
+                        color: timeLeft < 60 ? 'red' : (timeLeft < 300 ? 'orange' : 'inherit')
                     }}>
-                        Оставшееся время: {formatTimeLeft()}
+                        {timeExpired
+                            ? 'Время истекло!'
+                            : `Оставшееся время: ${formatTimeLeft()}`}
                     </div>
                 )}
                 <div>
@@ -236,7 +295,8 @@ const TestTaking = () => {
                                 padding: '0.75rem',
                                 backgroundColor: '#f9f9f9',
                                 borderRadius: '4px',
-                                cursor: 'pointer'
+                                cursor: timeExpired ? 'not-allowed' : 'pointer',
+                                opacity: timeExpired ? 0.7 : 1
                             }}>
                                 <input
                                     type={currentQuestion.type === 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}
@@ -251,6 +311,7 @@ const TestTaking = () => {
                                         answer.id,
                                         currentQuestion.type === 'MULTIPLE_CHOICE'
                                     )}
+                                    disabled={timeExpired}
                                     style={{ marginRight: '1rem' }}
                                 />
                                 {answer.text}
@@ -267,15 +328,15 @@ const TestTaking = () => {
             }}>
                 <button
                     onClick={handlePrevQuestion}
-                    disabled={currentQuestionIndex === 0}
+                    disabled={currentQuestionIndex === 0 || submitting}
                     style={{
                         backgroundColor: '#2196F3',
                         color: 'white',
                         padding: '0.5rem 1rem',
                         borderRadius: '4px',
                         border: 'none',
-                        cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer',
-                        opacity: currentQuestionIndex === 0 ? 0.5 : 1
+                        cursor: currentQuestionIndex === 0 || submitting ? 'not-allowed' : 'pointer',
+                        opacity: currentQuestionIndex === 0 || submitting ? 0.5 : 1
                     }}
                 >
                     Предыдущий вопрос
@@ -284,20 +345,22 @@ const TestTaking = () => {
                 {currentQuestionIndex < questions.length - 1 ? (
                     <button
                         onClick={handleNextQuestion}
+                        disabled={submitting}
                         style={{
                             backgroundColor: '#2196F3',
                             color: 'white',
                             padding: '0.5rem 1rem',
                             borderRadius: '4px',
                             border: 'none',
-                            cursor: 'pointer'
+                            cursor: submitting ? 'not-allowed' : 'pointer',
+                            opacity: submitting ? 0.5 : 1
                         }}
                     >
                         Следующий вопрос
                     </button>
                 ) : (
                     <button
-                        onClick={handleSubmitTest}
+                        onClick={() => handleSubmitTest(false)}
                         disabled={submitting}
                         style={{
                             backgroundColor: '#4CAF50',
@@ -305,7 +368,8 @@ const TestTaking = () => {
                             padding: '0.5rem 1rem',
                             borderRadius: '4px',
                             border: 'none',
-                            cursor: submitting ? 'not-allowed' : 'pointer'
+                            cursor: submitting ? 'not-allowed' : 'pointer',
+                            opacity: submitting ? 0.5 : 1
                         }}
                     >
                         {submitting ? 'Отправка...' : 'Завершить тест'}
@@ -323,6 +387,7 @@ const TestTaking = () => {
                     <button
                         key={question.id}
                         onClick={() => setCurrentQuestionIndex(index)}
+                        disabled={submitting}
                         style={{
                             width: '2.5rem',
                             height: '2.5rem',
@@ -339,7 +404,8 @@ const TestTaking = () => {
                             color: 'white',
                             borderRadius: '50%',
                             border: 'none',
-                            cursor: 'pointer'
+                            cursor: submitting ? 'not-allowed' : 'pointer',
+                            opacity: submitting ? 0.7 : 1
                         }}
                     >
                         {index + 1}
@@ -349,7 +415,7 @@ const TestTaking = () => {
 
             <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <button
-                    onClick={handleSubmitTest}
+                    onClick={() => handleSubmitTest(false)}
                     disabled={submitting}
                     style={{
                         backgroundColor: '#4CAF50',
@@ -357,7 +423,8 @@ const TestTaking = () => {
                         padding: '0.5rem 1rem',
                         borderRadius: '4px',
                         border: 'none',
-                        cursor: submitting ? 'not-allowed' : 'pointer'
+                        cursor: submitting ? 'not-allowed' : 'pointer',
+                        opacity: submitting ? 0.5 : 1
                     }}
                 >
                     {submitting ? 'Отправка...' : 'Завершить тест'}

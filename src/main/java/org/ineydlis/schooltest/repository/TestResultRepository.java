@@ -11,12 +11,20 @@ import java.util.Optional;
 
 @Repository
 public interface TestResultRepository extends JpaRepository<TestResult, Long> {
-    List<TestResult> findByStudent(User student);
+    // Add or update these methods in the TestResultRepository interface
 
-    List<TestResult> findByTest(Test test);
+    // This gets all incomplete attempts for a test and student
+    List<TestResult> findByTestAndStudentAndCompleted(Test test, User student, boolean completed);
 
+    // This gets the single, unique incomplete attempt (if exists) for a test and student
     Optional<TestResult> findByTestAndStudentAndCompletedFalse(Test test, User student);
 
-    List<TestResult> findByTestAndCompleted(Test test, boolean completed);
-    List<TestResult> findByTestAndStudentAndCompleted(Test test, User student, boolean completed);
+    // Method to find all results for a given test
+    List<TestResult> findByTest(Test test);
+
+    // Method to find all results for a given student
+    List<TestResult> findByStudent(User student);
+
+    // Method to find all results for a given test and student
+    List<TestResult> findByTestAndStudent(Test test, User student);
 }
