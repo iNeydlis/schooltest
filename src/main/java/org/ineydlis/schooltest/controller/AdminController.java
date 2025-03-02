@@ -1,18 +1,23 @@
 package org.ineydlis.schooltest.controller;
 
 import org.ineydlis.schooltest.dto.UserDto;
+import org.ineydlis.schooltest.model.Grade;
+import org.ineydlis.schooltest.model.Subject;
 import org.ineydlis.schooltest.model.User;
 import org.ineydlis.schooltest.model.UserRole;
+import org.ineydlis.schooltest.repository.GradeRepository;
+import org.ineydlis.schooltest.repository.SubjectRepository;
 import org.ineydlis.schooltest.repository.UserRepository;
 import org.ineydlis.schooltest.service.AuthService;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -22,92 +27,99 @@ public class AdminController {
     private UserRepository userRepository;
 
     @Autowired
-    private AuthService authService;
+    private GradeRepository gradeRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private SubjectRepository subjectRepository;
+
+    @Autowired
+    private AuthService authService;
 
     @GetMapping("/users")
-    public ResponseEntity<List<User>> getAllUsers(HttpServletRequest request) {
-        User currentUser = (User) request.getAttribute("user");
-
-        if (currentUser.getRole() != UserRole.ADMIN) {
-            return ResponseEntity.status(403).build();
-        }
-
-        List<User> users = userRepository.findAll();
-        // Не отправляем пароли
-        users.forEach(user -> user.setPassword(null));
-
-        return ResponseEntity.ok(users);
+    public ResponseEntity<List<User>> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
     }
 
     @PostMapping("/users")
-    public ResponseEntity<User> createUser(@RequestBody UserDto userDto, HttpServletRequest request) {
-        User currentUser = (User) request.getAttribute("user");
+    public ResponseEntity<User> createUser(@RequestBody UserDto userDto) {
+        User user = new User();
+        user.setUsername(userDto.getUsername());
+        user.setPassword(authService.encodePassword(userDto.getPassword()));
+        user.setFullName(userDto.getFullName());
+        user.setEmail(userDto.getEmail());
+        user.setRole(userDto.getRole());
+        user.setActive(userDto.isActive());
 
-        if (currentUser.getRole() != UserRole.ADMIN) {
-            return ResponseEntity.status(403).build();
+        // Установка класса для ученика
+        if (userDto.getRole() == UserRole.STUDENT && userDto.getGradeName() != null) {
+            Optional<Grade> grade = gradeRepository.findByFullName(userDto.getGradeName());
+            if (grade.isPresent()) {
+                user.setGrade(grade.get());
+            }
         }
 
-        User savedUser = authService.createUser(userDto);
-        savedUser.setPassword(null); // Не возвращаем пароль
+        // Установка предметов для учителя
+        if (userDto.getRole() == UserRole.TEACHER && userDto.getSubjectNames() != null) {
+            Set<Subject> subjects = new HashSet<>();
+            for (String subjectName : userDto.getSubjectNames()) {
+                Optional<Subject> subject = subjectRepository.findByName(subjectName);
+                subject.ifPresent(subjects::add);
+            }
+            user.setSubjects(subjects);
+        }
 
-        return ResponseEntity.ok(savedUser);
+        return ResponseEntity.ok(userRepository.save(user));
     }
 
     @PutMapping("/users/{id}")
-    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody UserDto userDto, HttpServletRequest request) {
-        User currentUser = (User) request.getAttribute("user");
-
-        if (currentUser.getRole() != UserRole.ADMIN) {
-            return ResponseEntity.status(403).build();
-        }
-
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody UserDto userDto) {
         Optional<User> userOpt = userRepository.findById(id);
         if (userOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         User user = userOpt.get();
-
-        // Обновляем данные
         user.setFullName(userDto.getFullName());
         user.setEmail(userDto.getEmail());
         user.setRole(userDto.getRole());
-        user.setGrade(userDto.getGrade());
-        user.setGroup(userDto.getGroup());
-        user.setSubjects(userDto.getSubjects());
         user.setActive(userDto.isActive());
 
-        // Обновляем пароль только если он предоставлен
+        // Обновить пароль только если был предоставлен
         if (userDto.getPassword() != null && !userDto.getPassword().isEmpty()) {
-            user.setPassword(passwordEncoder.encode(userDto.getPassword()));
+            user.setPassword(authService.encodePassword(userDto.getPassword()));
         }
 
-        User updatedUser = userRepository.save(user);
-        updatedUser.setPassword(null); // Не возвращаем пароль
+        // Сбросить предыдущие связи
+        user.setGrade(null);
+        user.setSubjects(new HashSet<>());
 
-        return ResponseEntity.ok(updatedUser);
+        // Установка класса для ученика
+        if (userDto.getRole() == UserRole.STUDENT && userDto.getGradeName() != null) {
+            Optional<Grade> grade = gradeRepository.findByFullName(userDto.getGradeName());
+            if (grade.isPresent()) {
+                user.setGrade(grade.get());
+            }
+        }
+
+        // Установка предметов для учителя
+        if (userDto.getRole() == UserRole.TEACHER && userDto.getSubjectNames() != null) {
+            Set<Subject> subjects = new HashSet<>();
+            for (String subjectName : userDto.getSubjectNames()) {
+                Optional<Subject> subject = subjectRepository.findByName(subjectName);
+                subject.ifPresent(subjects::add);
+            }
+            user.setSubjects(subjects);
+        }
+
+        return ResponseEntity.ok(userRepository.save(user));
     }
 
     @DeleteMapping("/users/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id, HttpServletRequest request) {
-        User currentUser = (User) request.getAttribute("user");
-
-        if (currentUser.getRole() != UserRole.ADMIN) {
-            return ResponseEntity.status(403).build();
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        if (!userRepository.existsById(id)) {
+            return ResponseEntity.notFound().build();
         }
-
-        if (currentUser.getId().equals(id)) {
-            return ResponseEntity.badRequest().build(); // Нельзя удалить самого себя
-        }
-
-        if (userRepository.existsById(id)) {
-            userRepository.deleteById(id);
-            return ResponseEntity.ok().build();
-        }
-
-        return ResponseEntity.notFound().build();
+        userRepository.deleteById(id);
+        return ResponseEntity.ok().build();
     }
 }

@@ -36,14 +36,20 @@ public class User {
     @Enumerated(EnumType.STRING)
     private UserRole role;
 
-    // Для учеников - класс и группа
-    private String grade;
-    @Column(name = "\"group\"") // Заключаем название поля в кавычки
-    private String group;
+    // Для учеников - класс
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "grade_id")
+    private Grade grade;
 
     // Для учителей - преподаваемые предметы
-    @ElementCollection
-    private Set<String> subjects = new HashSet<>();
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "teacher_subjects",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "subject_id")
+    )
+    private Set<Subject> subjects = new HashSet<>();
+
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime lastLogin;
 
@@ -52,4 +58,3 @@ public class User {
     // Токен для сохранения сессии
     private String token;
 }
-

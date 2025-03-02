@@ -16,7 +16,6 @@ public class LoginResponse {
     private String fullName;
     private String role;
     private String email;
-    private String grade;
-    private String group;
-    private Set<String> subjects;
+    private String gradeName; // Изменено: теперь это полное имя класса
+    private Set<String> subjectNames; // Изменено: теперь это имена предметов
 }

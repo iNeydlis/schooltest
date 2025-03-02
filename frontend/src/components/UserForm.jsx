@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 
-const UserForm = ({ user, onSubmit, onCancel }) => {
+const UserForm = ({ user, grades, subjects, onSubmit, onCancel }) => {
     const [formData, setFormData] = useState({
         username: '',
         password: '',
         fullName: '',
         email: '',
         role: 'STUDENT',
-        grade: '',
-        group: '',
-        subjects: [],
+        gradeName: '',
+        subjectNames: [],
         active: true
     });
+    const [errors, setErrors] = useState({});
 
     useEffect(() => {
         if (user) {
@@ -19,29 +19,75 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
             setFormData({
                 ...user,
                 password: '', // Пароль не передаем для редактирования
-                subjects: user.subjects || []
             });
         }
     }, [user]);
 
+    const validateForm = () => {
+        const newErrors = {};
+
+        if (!formData.fullName) newErrors.fullName = 'Обязательное поле';
+        if (!formData.email) newErrors.email = 'Обязательное поле';
+
+        // Проверяем логин и пароль только при создании нового пользователя
+        if (!user) {
+            if (!formData.username) newErrors.username = 'Обязательное поле';
+            if (!formData.password) newErrors.password = 'Обязательное поле';
+        }
+
+        // Проверяем выбор класса для ученика
+        if (formData.role === 'STUDENT' && !formData.gradeName) {
+            newErrors.gradeName = 'Класс обязателен для ученика';
+        }
+
+        // Проверяем выбор предметов для учителя
+        if (formData.role === 'TEACHER' && (!formData.subjectNames || formData.subjectNames.length === 0)) {
+            newErrors.subjectNames = 'Выберите хотя бы один предмет для учителя';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
 
-        if (name === 'subjects') {
-            // Преобразуем строку с предметами в массив
-            const subjectsArray = value.split(',').map(s => s.trim()).filter(Boolean);
-            setFormData(prev => ({ ...prev, subjects: subjectsArray }));
+        if (type === 'checkbox') {
+            setFormData({ ...formData, [name]: checked });
         } else {
-            setFormData(prev => ({
-                ...prev,
-                [name]: type === 'checkbox' ? checked : value
-            }));
+            setFormData({ ...formData, [name]: value });
         }
+
+        // При смене роли, сбрасываем связанные поля
+        if (name === 'role') {
+            if (value === 'STUDENT') {
+                setFormData(prev => ({ ...prev, role: value, subjectNames: [] }));
+            } else if (value === 'TEACHER') {
+                setFormData(prev => ({ ...prev, role: value, gradeName: '' }));
+            } else {
+                setFormData(prev => ({ ...prev, role: value, gradeName: '', subjectNames: [] }));
+            }
+        }
+    };
+
+    const handleSubjectChange = (e) => {
+        const subjectName = e.target.value;
+        const isChecked = e.target.checked;
+
+        setFormData(prev => {
+            const newSubjects = isChecked
+                ? [...prev.subjectNames, subjectName]
+                : prev.subjectNames.filter(name => name !== subjectName);
+
+            return { ...prev, subjectNames: newSubjects };
+        });
     };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit(formData);
+        if (validateForm()) {
+            onSubmit(formData);
+        }
     };
 
     return (
@@ -66,6 +112,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
                         required
                         disabled={!!user} // Запрещаем изменение имени пользователя при редактировании
                     />
+                    {errors.username && <div style={{ color: 'red' }}>{errors.username}</div>}
                 </div>
 
                 <div className="form-group">
@@ -78,6 +125,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
                         onChange={handleChange}
                         required={!user}
                     />
+                    {errors.password && <div style={{ color: 'red' }}>{errors.password}</div>}
                 </div>
 
                 <div className="form-group">
@@ -90,6 +138,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
                         onChange={handleChange}
                         required
                     />
+                    {errors.fullName && <div style={{ color: 'red' }}>{errors.fullName}</div>}
                 </div>
 
                 <div className="form-group">
@@ -102,6 +151,7 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
                         onChange={handleChange}
                         required
                     />
+                    {errors.email && <div style={{ color: 'red' }}>{errors.email}</div>}
                 </div>
 
                 <div className="form-group">
@@ -120,41 +170,50 @@ const UserForm = ({ user, onSubmit, onCancel }) => {
                 </div>
 
                 {formData.role === 'STUDENT' && (
-                    <>
-                        <div className="form-group">
-                            <label htmlFor="grade">Класс</label>
-                            <input
-                                id="grade"
-                                name="grade"
-                                type="text"
-                                value={formData.grade || ''}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="group">Группа</label>
-                            <input
-                                id="group"
-                                name="group"
-                                type="text"
-                                value={formData.group || ''}
-                                onChange={handleChange}
-                            />
-                        </div>
-                    </>
+                    <div className="form-group">
+                        <label htmlFor="gradeName">Класс</label>
+                        <select
+                            id="gradeName"
+                            name="gradeName"
+                            value={formData.gradeName || ''}
+                            onChange={handleChange}
+                            required
+                        >
+                            <option value="">Выберите класс</option>
+                            {grades && grades.map(grade => (
+                                <option key={grade.id} value={grade.fullName}>
+                                    {grade.fullName}
+                                </option>
+                            ))}
+                        </select>
+                        {errors.gradeName && <div style={{ color: 'red' }}>{errors.gradeName}</div>}
+                    </div>
                 )}
 
                 {formData.role === 'TEACHER' && (
                     <div className="form-group">
-                        <label htmlFor="subjects">Предметы (через запятую)</label>
-                        <input
-                            id="subjects"
-                            name="subjects"
-                            type="text"
-                            value={formData.subjects.join(', ')}
-                            onChange={handleChange}
-                        />
+                        <label>Предметы</label>
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                            gap: '0.5rem',
+                            marginTop: '0.5rem'
+                        }}>
+                            {subjects && subjects.map(subject => (
+                                <div key={subject.id} style={{ display: 'flex', alignItems: 'center' }}>
+                                    <input
+                                        type="checkbox"
+                                        id={`subject-${subject.id}`}
+                                        value={subject.name}
+                                        checked={formData.subjectNames.includes(subject.name)}
+                                        onChange={handleSubjectChange}
+                                        style={{ marginRight: '0.5rem' }}
+                                    />
+                                    <label htmlFor={`subject-${subject.id}`}>{subject.name}</label>
+                                </div>
+                            ))}
+                        </div>
+                        {errors.subjectNames && <div style={{ color: 'red' }}>{errors.subjectNames}</div>}
                     </div>
                 )}
 

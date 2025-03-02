@@ -9,6 +9,8 @@ const AdminPanel = () => {
     const [error, setError] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
+    const [grades, setGrades] = useState([]);
+    const [subjects, setSubjects] = useState([]);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -32,8 +34,43 @@ const AdminPanel = () => {
         }
     };
 
+    const fetchGradesAndSubjects = async () => {
+        try {
+            // Загрузка списка классов
+            const gradesResponse = await fetch('/api/grades', {
+                headers: {
+                    'Authorization': `${user.token}`
+                }
+            });
+
+            if (!gradesResponse.ok) {
+                throw new Error('Ошибка загрузки классов');
+            }
+
+            const gradesData = await gradesResponse.json();
+            setGrades(gradesData);
+
+            // Загрузка списка предметов
+            const subjectsResponse = await fetch('/api/subjects', {
+                headers: {
+                    'Authorization': `${user.token}`
+                }
+            });
+
+            if (!subjectsResponse.ok) {
+                throw new Error('Ошибка загрузки предметов');
+            }
+
+            const subjectsData = await subjectsResponse.json();
+            setSubjects(subjectsData);
+        } catch (err) {
+            setError(err.message || 'Ошибка загрузки справочных данных');
+        }
+    };
+
     useEffect(() => {
         fetchUsers();
+        fetchGradesAndSubjects();
     }, [user.token]);
 
     const handleCreateUser = () => {
@@ -49,9 +86,8 @@ const AdminPanel = () => {
             fullName: userData.fullName,
             email: userData.email,
             role: userData.role,
-            grade: userData.grade,
-            group: userData.group,
-            subjects: userData.subjects,
+            gradeName: userData.grade ? userData.grade.fullName : null,
+            subjectNames: userData.subjects ? userData.subjects.map(s => s.name) : [],
             active: userData.active
             // Не включаем пароль, он будет добавлен в форме если нужно
         };
@@ -59,7 +95,6 @@ const AdminPanel = () => {
         setEditingUser(userDtoData);
         setShowForm(true);
     };
-
 
     const handleDeleteUser = async (id) => {
         if (!window.confirm('Вы уверены, что хотите удалить этого пользователя?')) {
@@ -92,11 +127,15 @@ const AdminPanel = () => {
                 fullName: formData.fullName,
                 email: formData.email,
                 role: formData.role,
-                grade: formData.grade || null,  // Эти поля могут быть null в зависимости от роли
-                group: formData.group || null,
-                subjects: formData.subjects || [],
+                gradeName: formData.gradeName || null,  // Имя класса вместо объекта
+                subjectNames: formData.subjectNames || [],  // Имена предметов вместо объектов
                 active: formData.active
             };
+
+            // Добавляем имя пользователя только при создании нового пользователя
+            if (!editingUser) {
+                userDto.username = formData.username;
+            }
 
             // Добавляем пароль только если он был введен
             if (formData.password && formData.password.trim() !== '') {
@@ -157,6 +196,8 @@ const AdminPanel = () => {
             {showForm && (
                 <UserForm
                     user={editingUser}
+                    grades={grades}
+                    subjects={subjects}
                     onSubmit={handleFormSubmit}
                     onCancel={() => setShowForm(false)}
                 />
@@ -170,6 +211,7 @@ const AdminPanel = () => {
                     <th>Полное имя</th>
                     <th>Email</th>
                     <th>Роль</th>
+                    <th>Класс/Предметы</th>
                     <th>Статус</th>
                     <th>Действия</th>
                 </tr>
@@ -182,6 +224,11 @@ const AdminPanel = () => {
                         <td>{u.fullName}</td>
                         <td>{u.email}</td>
                         <td>{u.role}</td>
+                        <td>
+                            {u.role === 'STUDENT' && u.grade ? u.grade.fullName : null}
+                            {u.role === 'TEACHER' && u.subjects ?
+                                u.subjects.map(s => s.name).join(', ') : null}
+                        </td>
                         <td>{u.active ? 'Активен' : 'Неактивен'}</td>
                         <td style={{ display: 'flex', gap: '0.5rem' }}>
                             <button

@@ -4,8 +4,10 @@ import { AuthContext } from '../context/AuthContext';
 const Dashboard = () => {
     const { user } = useContext(AuthContext);
 
-    // Преобразование массива предметов в строку для отображения
-    const subjectsDisplay = user.subjects ? user.subjects.join(', ') : 'Не указаны';
+    // Преобразование набора имен предметов в строку для отображения
+    const subjectsDisplay = user.subjectNames
+        ? Array.from(user.subjectNames).join(', ')
+        : 'Не указаны';
 
     return (
         <div>
@@ -42,10 +44,7 @@ const Dashboard = () => {
                     {user.role === 'STUDENT' && (
                         <>
                             <div><strong>Класс:</strong></div>
-                            <div>{user.grade}</div>
-
-                            <div><strong>Группа:</strong></div>
-                            <div>{user.group || 'Не указана'}</div>
+                            <div>{user.gradeName || 'Не указан'}</div>
                         </>
                     )}
                 </div>

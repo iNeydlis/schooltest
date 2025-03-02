@@ -13,8 +13,7 @@ public class UserDto {
     private String fullName;
     private String email;
     private UserRole role;
-    private String grade;
-    private String group;
-    private Set<String> subjects;
+    private String gradeName; // Изменено: теперь это имя класса (например, "1А")
+    private Set<String> subjectNames; // Изменено: теперь это набор имён предметов
     private boolean active;
 }
