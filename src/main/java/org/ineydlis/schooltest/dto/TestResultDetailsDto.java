@@ -176,7 +176,7 @@ public class TestResultDetailsDto {
         dto.setTotalQuestionsCount(testResult.getStudentAnswers().size());
 
         if (dto.getTotalQuestionsCount() > 0) {
-            dto.setPercentageCorrect(Math.round(((double) correctCount / dto.getTotalQuestionsCount()) * 100 * 100.0) / 100.0);
+            dto.setPercentageCorrect(Math.round(((double) dto.getScore() / dto.getMaxScore()) * 100 * 100.0) / 100.0);
         }
 
         return dto;
