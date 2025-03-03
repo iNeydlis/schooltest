@@ -276,7 +276,28 @@ public class TestService {
         testRepository.save(test);
         return TestDto.fromEntity(test);
     }
+    @Transactional
+    public void permanentlyDeleteTest(Long testId, Long userId) {
+        Test test = testRepository.findById(testId)
+                .orElseThrow(() -> new RuntimeException("Тест не найден"));
 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        // Check permissions - only admins or the creator of the test can permanently delete it
+        if (user.getRole() == UserRole.TEACHER && !test.getCreator().getId().equals(userId)) {
+            throw new RuntimeException("Вы можете полностью удалять только свои тесты");
+        } else if (user.getRole() != UserRole.ADMIN && user.getRole() != UserRole.TEACHER) {
+            throw new RuntimeException("У вас нет прав на полное удаление тестов");
+        }
+
+        // Find and delete all test results associated with this test
+        List<TestResult> results = testResultRepository.findByTest(test);
+        testResultRepository.deleteAll(results);
+
+        // Delete the test itself
+        testRepository.delete(test);
+    }
     // Delete a test (for teachers and admins)
     @Transactional
     public void deleteTest(Long testId, Long userId) {
@@ -293,16 +314,42 @@ public class TestService {
             throw new RuntimeException("У вас нет прав на удаление тестов");
         }
 
-        // Check if test has any results
-        List<TestResult> results = testResultRepository.findByTest(test);
-        if (!results.isEmpty()) {
-            // Instead of deleting, just mark as inactive
-            test.setActive(false);
-            testRepository.save(test);
-        } else {
-            // If no results, can safely delete
-            testRepository.delete(test);
+        // Always mark as inactive instead of deleting
+        test.setActive(false);
+        testRepository.save(test);
+    }
+    @Transactional
+    public TestDto reactivateTest(Long testId, Long userId, boolean clearAttempts) {
+        Test test = testRepository.findById(testId)
+                .orElseThrow(() -> new RuntimeException("Тест не найден"));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        // Check permissions
+        if (user.getRole() == UserRole.TEACHER && !test.getCreator().getId().equals(userId)) {
+            throw new RuntimeException("Вы можете активировать только свои тесты");
+        } else if (user.getRole() != UserRole.ADMIN && user.getRole() != UserRole.TEACHER) {
+            throw new RuntimeException("У вас нет прав на активацию тестов");
         }
+
+        // If the test is already active, return it as is
+        if (test.isActive()) {
+            return TestDto.fromEntity(test);
+        }
+
+        // Reactivate the test
+        test.setActive(true);
+        test.setUpdatedAt(LocalDateTime.now());
+
+        // Clear all attempts if requested
+        if (clearAttempts) {
+            List<TestResult> results = testResultRepository.findByTest(test);
+            testResultRepository.deleteAll(results);
+        }
+
+        Test savedTest = testRepository.save(test);
+        return TestDto.fromEntity(savedTest);
     }
 
     public TestResultDto getInProgressTest(Long testId, Long studentId) {

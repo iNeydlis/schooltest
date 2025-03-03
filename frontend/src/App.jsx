@@ -90,7 +90,7 @@ const App = () => {
                             path="/tests/result/:resultId"
                             element={
                                 user && user.role === 'STUDENT' ?
-                                    <TestResultDetails /> : <Navigate to="/tests" />
+                                    <TestResult /> : <Navigate to="/tests" />
                             }
                         />
 

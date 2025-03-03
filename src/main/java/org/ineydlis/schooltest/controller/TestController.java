@@ -88,6 +88,29 @@ public class TestController {
         TestResultDetailsDto resultDetails = testService.getTestResultDetails(resultId, currentUser.getId());
         return ResponseEntity.ok(resultDetails);
     }
+    @DeleteMapping("/{testId}/permanent")
+    public ResponseEntity<?> permanentlyDeleteTest(
+            @PathVariable Long testId,
+            @RequestHeader("Authorization") String token) {
+        User currentUser = getCurrentUser(token);
+
+        testService.permanentlyDeleteTest(testId, currentUser.getId());
+        return ResponseEntity.ok().build();
+    }
+    @PostMapping("/{testId}/reactivate")
+    public ResponseEntity<TestDto> reactivateTest(
+            @PathVariable Long testId,
+            @RequestParam(required = false, defaultValue = "false") boolean clearAttempts,
+            @RequestHeader("Authorization") String token) {
+        User currentUser = getCurrentUser(token);
+
+        if (currentUser.getRole() != UserRole.TEACHER && currentUser.getRole() != UserRole.ADMIN) {
+            throw new RuntimeException("У вас нет прав на активацию тестов");
+        }
+
+        TestDto reactivatedTest = testService.reactivateTest(testId, currentUser.getId(), clearAttempts);
+        return ResponseEntity.ok(reactivatedTest);
+    }
     // Get test by ID with questions
     @GetMapping("/{testId}")
     public ResponseEntity<TestDto> getTestById(

@@ -193,7 +193,7 @@ const TestResultDetails = () => {
             {/* Кнопка возврата */}
             <div style={{ marginTop: '2rem' }}>
                 <Link
-                    to={user?.role === 'STUDENT' ? "/tests/results" : `/tests/${resultDetails.testId}/results`}
+                    to={user?.role === 'STUDENT' ? "/tests" : `/tests/${resultDetails.testId}/results`}
                     style={{
                         backgroundColor: '#9E9E9E',
                         color: 'white',

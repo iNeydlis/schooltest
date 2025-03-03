@@ -72,11 +72,17 @@ class TestService {
                 return api.post(`/tests/${testId}/start`);
             });
     }
-    async getTestResultDetails(resultId) {
+    getTestResultDetails(resultId) {
         return api.get(`/tests/result/${resultId}`);
     }
     submitTest(submissionData) {
         return api.post(`/tests/submit`, submissionData);
+    }
+    reactivateTest(id, clearAttempts = false) {
+        return api.post(`/tests/${id}/reactivate?clearAttempts=${clearAttempts}`);
+    }
+    permanentlyDeleteTest(testId) {
+        return api.delete(`/tests/${testId}/permanent`);
     }
 }
 
