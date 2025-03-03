@@ -134,9 +134,8 @@ const TestResultsList = () => {
     return (
         <div>
             <h2>
-                {testId && test
-                    ? `Результаты теста "${test.title}"`
-                    : 'Мои результаты тестирования'}
+                {`Результаты теста`}
+
             </h2>
 
             {/* Debug info */}

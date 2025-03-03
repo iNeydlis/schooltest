@@ -161,9 +161,13 @@ const TestsList = () => {
                 {/* Добавленная информация для учеников */}
                 {user?.role === 'STUDENT' && (
                     <>
-                        {test.bestScore !== undefined && (
-                            <p style={{ color: '#2E7D32' }}>
-                                <strong>Лучший результат:</strong> {test.bestScore} из {test.maxScore || '?'} баллов
+                        {test.bestScore !== undefined && test.bestScore !== null && test.bestScore !== '' ? (
+                            <p style={{ color: test.bestScore > 0 ? '#2E7D32' : '#757575' }}>
+                                <strong>Лучший результат:</strong> {test.bestScore} из {test.totalPoints || '?'} баллов
+                            </p>
+                        ) : (
+                            <p style={{ color: '#1976D2' }}>
+                                <strong>Статус:</strong> Требуется пройти тест
                             </p>
                         )}
                         {test.maxAttempts !== undefined && (

@@ -29,9 +29,11 @@ public class TestDto {
     private Set<String> availableGrades;
     private Integer questionCount;
     private Integer totalPoints;
+    private Integer maxScore; // Added for UI consistency
     private Integer maxAttempts;
     private Integer bestScore; // Лучший результат ученика
     private Integer remainingAttempts; // Оставшиеся попытки
+
 
     public static TestDto fromEntity(Test test) {
         return TestDto.builder()
@@ -51,6 +53,9 @@ public class TestDto {
                         .collect(Collectors.toSet()))
                 .questionCount(test.getQuestions().size())
                 .totalPoints(test.getQuestions().stream()
+                        .mapToInt(q -> q.getPoints())
+                        .sum())
+                .maxScore(test.getQuestions().stream() // Same as totalPoints
                         .mapToInt(q -> q.getPoints())
                         .sum())
                 .maxAttempts(test.getMaxAttempts())
