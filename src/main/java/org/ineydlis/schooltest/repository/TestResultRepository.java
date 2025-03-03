@@ -1,9 +1,13 @@
 package org.ineydlis.schooltest.repository;
 
+import jakarta.persistence.LockModeType;
 import org.ineydlis.schooltest.model.Test;
 import org.ineydlis.schooltest.model.TestResult;
 import org.ineydlis.schooltest.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -27,4 +31,11 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
 
     // Method to find all results for a given test and student
     List<TestResult> findByTestAndStudent(Test test, User student);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT tr FROM TestResult tr WHERE tr.test = :test AND tr.student = :student AND tr.completed = :completed")
+    List<TestResult> findByTestAndStudentAndCompletedForUpdate(
+            @Param("test") Test test,
+            @Param("student") User student,
+            @Param("completed") boolean completed);
 }

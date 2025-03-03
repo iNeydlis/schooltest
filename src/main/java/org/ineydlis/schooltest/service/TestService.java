@@ -5,6 +5,7 @@ import org.ineydlis.schooltest.model.*;
 import org.ineydlis.schooltest.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -375,8 +376,7 @@ public class TestService {
         return null;
     }
 
-    // Fix the startTest method to handle the unique result issue
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public TestResultDto startTest(Long testId, Long studentId) {
         Test test = testRepository.findById(testId)
                 .orElseThrow(() -> new RuntimeException("Тест не найден"));
@@ -407,13 +407,12 @@ public class TestService {
                     test.getMaxAttempts() + ") для этого теста");
         }
 
-        // Check if the student has an ongoing attempt
+        // Check if the student has an ongoing attempt - use a more specific query with locking
         List<TestResult> incompleteAttempts =
-                testResultRepository.findByTestAndStudentAndCompleted(test, student, false);
+                testResultRepository.findByTestAndStudentAndCompletedForUpdate(test, student, false);
 
-        // Fix for the "Query did not return a unique result: 2 results were returned" error
-        // If multiple incomplete attempts exist, keep only the most recent one
-        if (incompleteAttempts.size() > 1) {
+        // Handle multiple incomplete attempts
+        if (!incompleteAttempts.isEmpty()) {
             // Sort by startedAt descending to get the most recent one
             incompleteAttempts.sort((a, b) -> b.getStartedAt().compareTo(a.getStartedAt()));
 
@@ -423,19 +422,34 @@ public class TestService {
                 testResultRepository.delete(incompleteAttempts.get(i));
             }
 
+            // Check if the most recent test is too old (e.g., abandoned)
+            LocalDateTime deadline = mostRecent.getStartedAt().plusMinutes(test.getTimeLimit());
+            if (LocalDateTime.now().isAfter(deadline)) {
+                // If the test has expired, mark it as completed with zero score
+                mostRecent.setCompleted(true);
+                mostRecent.setCompletedAt(LocalDateTime.now());
+                mostRecent.setScore(0);
+                testResultRepository.save(mostRecent);
+
+                // Create a new test attempt
+                return createNewTestAttempt(test, student, completedAttempts.size() + 1);
+            }
+
             return TestResultDto.fromEntity(mostRecent);
-        } else if (incompleteAttempts.size() == 1) {
-            // If only one incomplete attempt exists, return it
-            return TestResultDto.fromEntity(incompleteAttempts.get(0));
         }
 
         // Create new test result
+        return createNewTestAttempt(test, student, completedAttempts.size() + 1);
+    }
+
+    // Helper method to create a new test attempt
+    private TestResultDto createNewTestAttempt(Test test, User student, int attemptNumber) {
         TestResult testResult = new TestResult();
         testResult.setTest(test);
         testResult.setStudent(student);
         testResult.setStartedAt(LocalDateTime.now());
         testResult.setCompleted(false);
-        testResult.setAttemptNumber(completedAttempts.size() + 1);
+        testResult.setAttemptNumber(attemptNumber);
         testResult.setMaxScore(test.getQuestions().stream()
                 .mapToInt(Question::getPoints)
                 .sum());

@@ -57,8 +57,14 @@ class TestService {
     }
 
     startTest(testId) {
-        // First check if there's an in-progress test before starting a new one
-        return this.getInProgressTest(testId)
+        // Instead of a simple boolean lock, use a request tracking mechanism
+        // Store the ongoing request promise so we can return it if called again
+        if (this.pendingStartRequest) {
+            return this.pendingStartRequest;
+        }
+
+        // Create a new request promise
+        this.pendingStartRequest = this.getInProgressTest(testId)
             .then(response => {
                 // If there's an existing in-progress test, return it
                 if (response && response.id) {
@@ -67,10 +73,17 @@ class TestService {
                 // Otherwise start a new test
                 return api.post(`/tests/${testId}/start`);
             })
-            .catch(() => {
+            .catch(error => {
+                console.error("Error in startTest:", error);
                 // If the endpoint doesn't exist or returns an error, fallback to original method
                 return api.post(`/tests/${testId}/start`);
+            })
+            .finally(() => {
+                // Clear the pending request once completed
+                this.pendingStartRequest = null;
             });
+
+        return this.pendingStartRequest;
     }
     getTestResultDetails(resultId) {
         return api.get(`/tests/result/${resultId}`);
