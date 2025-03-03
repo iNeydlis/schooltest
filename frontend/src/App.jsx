@@ -11,6 +11,7 @@ import TestResult from './pages/TestResult';
 import TestResultsList from './pages/TestResultsList';
 import Header from './components/Header';
 import Loading from './components/Loading';
+import TestResultDetails from "./pages/TestResultDetails.jsx";
 
 const App = () => {
     const { user, loading } = useContext(AuthContext);
@@ -77,24 +78,22 @@ const App = () => {
                                     <TestTaking /> : <Navigate to="/tests" />
                             }
                         />
-
+                        <Route
+                            path="/tests/teacher-result/:resultId"
+                            element={
+                                user && (user.role === 'TEACHER' || user.role === 'ADMIN') ?
+                                    <TestResultDetails /> : <Navigate to="/tests" />
+                            }
+                        />
                         {/* Результат теста: только для студентов */}
                         <Route
                             path="/tests/result/:resultId"
                             element={
                                 user && user.role === 'STUDENT' ?
-                                    <TestResult /> : <Navigate to="/tests" />
+                                    <TestResultDetails /> : <Navigate to="/tests" />
                             }
                         />
 
-                        {/* Мои результаты: только для студентов */}
-                        <Route
-                            path="/my-results"
-                            element={
-                                user && user.role === 'STUDENT' ?
-                                    <TestResultsList /> : <Navigate to="/tests" />
-                            }
-                        />
 
                         {/* Результаты теста: только для учителей и админов */}
                         <Route

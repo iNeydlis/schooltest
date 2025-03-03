@@ -78,7 +78,16 @@ public class TestController {
 
         return ResponseEntity.ok(tests);
     }
+    @GetMapping("/result/{resultId}")
+    public ResponseEntity<TestResultDetailsDto> getTestResultDetails(
+            @PathVariable Long resultId,
+            @RequestHeader("Authorization") String token) {
+        User currentUser = getCurrentUser(token);
 
+        // Получаем детали результата теста, включая ответы студента
+        TestResultDetailsDto resultDetails = testService.getTestResultDetails(resultId, currentUser.getId());
+        return ResponseEntity.ok(resultDetails);
+    }
     // Get test by ID with questions
     @GetMapping("/{testId}")
     public ResponseEntity<TestDto> getTestById(
@@ -195,7 +204,16 @@ public class TestController {
         List<TestResultDto> results = testService.getStudentResults(currentUser.getId());
         return ResponseEntity.ok(results);
     }
+    // Get specific test result by ID
+    @GetMapping("/results/{resultId}")
+    public ResponseEntity<TestResultDto> getTestResultById(
+            @PathVariable Long resultId,
+            @RequestHeader("Authorization") String token) {
+        User currentUser = getCurrentUser(token);
 
+        TestResultDto result = testService.getTestResultById(resultId, currentUser.getId());
+        return ResponseEntity.ok(result);
+    }
     // Get test results for a specific test (for teachers and admins)
     @GetMapping("/{testId}/results")
     public ResponseEntity<List<TestResultDto>> getTestResults(

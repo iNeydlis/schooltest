@@ -550,7 +550,75 @@ public class TestService {
                 .map(TestResultDto::fromEntity)
                 .collect(Collectors.toList());
     }
+    // Add this to TestService.java
+    public TestResultDto getTestResultById(Long resultId, Long userId) {
+        TestResult result = testResultRepository.findById(resultId)
+                .orElseThrow(() -> new RuntimeException("Результат теста не найден"));
 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        // Check permissions
+        if (user.getRole() == UserRole.TEACHER) {
+            Test test = result.getTest();
+            boolean isCreator = test.getCreator().getId().equals(userId);
+            boolean teachesSubject = user.getSubjects().stream()
+                    .anyMatch(s -> s.getId().equals(test.getSubject().getId()));
+
+            if (!isCreator && !teachesSubject) {
+                throw new RuntimeException("У вас нет доступа к этому результату теста");
+            }
+        } else if (user.getRole() == UserRole.STUDENT) {
+            // Students can only view their own results
+            if (!result.getStudent().getId().equals(userId)) {
+                throw new RuntimeException("У вас нет доступа к этому результату теста");
+            }
+        } else if (user.getRole() != UserRole.ADMIN) {
+            throw new RuntimeException("У вас нет прав на просмотр результатов теста");
+        }
+
+        return TestResultDto.fromEntity(result);
+    }
+    /**
+     * Получить детальную информацию о результате теста, включая ответы студента
+     *
+     * @param resultId ID результата теста
+     * @param userId ID пользователя, запрашивающего информацию
+     * @return Детальная информация о результате теста
+     */
+    public TestResultDetailsDto getTestResultDetails(Long resultId, Long userId) {
+        TestResult result = testResultRepository.findById(resultId)
+                .orElseThrow(() -> new RuntimeException("Результат теста не найден"));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        // Проверка прав доступа
+        if (user.getRole() == UserRole.TEACHER) {
+            Test test = result.getTest();
+            boolean isCreator = test.getCreator().getId().equals(userId);
+            boolean teachesSubject = user.getSubjects().stream()
+                    .anyMatch(s -> s.getId().equals(test.getSubject().getId()));
+
+            if (!isCreator && !teachesSubject) {
+                throw new RuntimeException("У вас нет доступа к этому результату теста");
+            }
+        } else if (user.getRole() == UserRole.STUDENT) {
+            // Студенты могут просматривать только свои результаты
+            if (!result.getStudent().getId().equals(userId)) {
+                throw new RuntimeException("У вас нет доступа к этому результату теста");
+            }
+        } else if (user.getRole() != UserRole.ADMIN) {
+            throw new RuntimeException("У вас нет прав на просмотр результатов теста");
+        }
+
+        // Если результат еще не завершен, выдаем ошибку
+        if (!result.isCompleted()) {
+            throw new RuntimeException("Этот тест еще не завершен");
+        }
+
+        return TestResultDetailsDto.fromEntity(result);
+    }
     // Get test results for a test (for teachers and admins)
     public List<TestResultDto> getTestResults(Long testId, Long userId) {
         Test test = testRepository.findById(testId)

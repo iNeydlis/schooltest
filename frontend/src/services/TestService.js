@@ -43,12 +43,12 @@ class TestService {
 
     // Get all test results for the current student
     getStudentResults() {
-        return api.get(`/student/results`);
+        return api.get(`/tests/results`);
     }
 
     // Get a specific test result by ID
     getResultById(resultId) {
-        return api.get(`/results/${resultId}`);
+        return api.get(`/tests/results/${resultId}`);
     }
 
     // Check if test is in progress and get the test result id
@@ -72,7 +72,9 @@ class TestService {
                 return api.post(`/tests/${testId}/start`);
             });
     }
-
+    async getTestResultDetails(resultId) {
+        return api.get(`/tests/result/${resultId}`);
+    }
     submitTest(submissionData) {
         return api.post(`/tests/submit`, submissionData);
     }
