@@ -179,6 +179,16 @@ public class TestResultDetailsDto {
             dto.setPercentageCorrect(Math.round(((double) dto.getScore() / dto.getMaxScore()) * 100 * 100.0) / 100.0);
         }
 
+        List<Long> selectedQuestionIds = testResult.getSelectedQuestionIds();
+        boolean hasSelectedQuestions = selectedQuestionIds != null && !selectedQuestionIds.isEmpty();
+
+
+        List<StudentAnswerDto> studentAnswers = testResult.getStudentAnswers().stream()
+                .filter(answer -> !hasSelectedQuestions || selectedQuestionIds.contains(answer.getQuestion().getId()))
+                .map(StudentAnswerDto::fromEntity)
+                .collect(Collectors.toList());
+
+        dto.setStudentAnswers(studentAnswers);
         return dto;
     }
 }

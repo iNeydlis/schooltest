@@ -60,6 +60,7 @@ public class TestService {
         test.setCreator(creator);
         test.setCreatedAt(LocalDateTime.now());
         test.setTimeLimit(request.getTimeLimit());
+        test.setQuestionsToShow(request.getQuestionsToShow());
 
         // Add available grades
         if (request.getGradeIds() != null && !request.getGradeIds().isEmpty()) {
@@ -220,6 +221,7 @@ public class TestService {
         test.setDescription(request.getDescription());
         test.setTimeLimit(request.getTimeLimit());
         test.setUpdatedAt(LocalDateTime.now());
+        test.setQuestionsToShow(request.getQuestionsToShow());
 
         // Update subject if changed and user has permission
         if (!test.getSubject().getId().equals(request.getSubjectId())) {
@@ -476,10 +478,54 @@ public class TestService {
             throw new RuntimeException("Тест уже завершен");
         }
 
-        // Get test questions without correct answer information
-        return testResult.getTest().getQuestions().stream()
-                .map(q -> QuestionDto.fromEntity(q, false))
-                .collect(Collectors.toList());
+        Test test = testResult.getTest();
+        List<Question> allQuestions = test.getQuestions();
+
+        // If questionsToShow is null or less than or equal to 0, or greater than total questions, show all questions
+        if (test.getQuestionsToShow() == null || test.getQuestionsToShow() <= 0 || test.getQuestionsToShow() >= allQuestions.size()) {
+            return allQuestions.stream()
+                    .map(q -> QuestionDto.fromEntity(q, false))
+                    .collect(Collectors.toList());
+        }
+
+        // If this is a new test result without assigned questions, randomly select questions
+        if (testResult.getSelectedQuestionIds() == null || testResult.getSelectedQuestionIds().isEmpty()) {
+            // Create a copy of the questions list and shuffle it
+            List<Question> questionsCopy = new ArrayList<>(allQuestions);
+            Collections.shuffle(questionsCopy);
+
+            // Take only the required number of questions
+            List<Question> selectedQuestions = questionsCopy.subList(0, test.getQuestionsToShow());
+
+            // Store the selected question IDs in the test result for consistency between requests
+            List<Long> selectedQuestionIds = selectedQuestions.stream()
+                    .map(Question::getId)
+                    .collect(Collectors.toList());
+
+            testResult.setSelectedQuestionIds(selectedQuestionIds);
+            testResultRepository.save(testResult);
+
+            return selectedQuestions.stream()
+                    .map(q -> QuestionDto.fromEntity(q, false))
+                    .collect(Collectors.toList());
+        } else {
+            // Use the previously selected questions
+            List<Long> selectedQuestionIds = testResult.getSelectedQuestionIds();
+
+            // Create a map for quick lookup of questions by ID
+            Map<Long, Question> questionMap = allQuestions.stream()
+                    .collect(Collectors.toMap(Question::getId, q -> q));
+
+            // Retrieve the previously selected questions in the original order
+            List<Question> selectedQuestions = selectedQuestionIds.stream()
+                    .map(questionMap::get)
+                    .filter(Objects::nonNull) // Filter out any questions that might have been deleted
+                    .collect(Collectors.toList());
+
+            return selectedQuestions.stream()
+                    .map(q -> QuestionDto.fromEntity(q, false))
+                    .collect(Collectors.toList());
+        }
     }
 
     // Submit answers for a test
@@ -509,16 +555,41 @@ public class TestService {
 
         // Process student answers
         int totalScore = 0;
+        int maxPossibleScore = 0;
 
         // Create a map of questionId -> Question for faster access
         Map<Long, Question> questionMap = test.getQuestions().stream()
                 .collect(Collectors.toMap(Question::getId, q -> q));
+
+        // Get the list of questions that should be considered for scoring
+        List<Long> questionIdsToConsider;
+        if (testResult.getSelectedQuestionIds() != null && !testResult.getSelectedQuestionIds().isEmpty()) {
+            questionIdsToConsider = testResult.getSelectedQuestionIds();
+        } else {
+            // If no specific questions were selected, consider all questions
+            questionIdsToConsider = test.getQuestions().stream()
+                    .map(Question::getId)
+                    .collect(Collectors.toList());
+        }
+
+        // Calculate the maximum possible score based on the selected questions only
+        for (Long questionId : questionIdsToConsider) {
+            Question question = questionMap.get(questionId);
+            if (question != null) {
+                maxPossibleScore += question.getPoints();
+            }
+        }
 
         // Process each answer
         for (StudentAnswerRequest answerRequest : request.getAnswers()) {
             Question question = questionMap.get(answerRequest.getQuestionId());
             if (question == null) {
                 continue; // Skip if question not found
+            }
+
+            // Skip questions that were not part of the selected set
+            if (!questionIdsToConsider.contains(question.getId())) {
+                continue;
             }
 
             StudentAnswer studentAnswer = new StudentAnswer();
@@ -582,6 +653,9 @@ public class TestService {
 
             testResult.getStudentAnswers().add(studentAnswer);
         }
+
+        // Update testResult with the correct maxScore based on selected questions
+        testResult.setMaxScore(maxPossibleScore);
 
         // Mark test as completed
         testResult.setCompleted(true);

@@ -18,4 +18,5 @@ public class TestCreateRequest {
     private Integer timeLimit;
     private List<QuestionDto> questions;
     private Integer maxAttempts = 1; // Default to 1 attempt
+    private Integer questionsToShow;
 }

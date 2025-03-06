@@ -44,6 +44,11 @@ public class TestResult {
 
     @Column(nullable = false)
     private Integer attemptNumber = 1;
+    @ElementCollection
+    @CollectionTable(name = "test_result_selected_questions",
+            joinColumns = @JoinColumn(name = "test_result_id"))
+    @Column(name = "question_id")
+    private List<Long> selectedQuestionIds = new ArrayList<>();
 
     @OneToMany(mappedBy = "testResult", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<StudentAnswer> studentAnswers = new ArrayList<>();
