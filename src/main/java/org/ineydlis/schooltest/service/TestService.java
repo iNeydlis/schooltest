@@ -141,14 +141,23 @@ public class TestService {
             // Найдем все попытки для этого теста и этого ученика
             List<TestResult> attempts = testResultRepository.findByTestAndStudent(test, student);
 
-            // Вычислим лучший результат
-            OptionalInt bestScore = attempts.stream()
+            // Найдем лучшую попытку
+            TestResult bestAttempt = attempts.stream()
                     .filter(TestResult::isCompleted)
-                    .mapToInt(TestResult::getScore)
-                    .max();
+                    .max(Comparator.comparing(TestResult::getScore))
+                    .orElse(null);
 
-            if (bestScore.isPresent()) {
-                testDto.setBestScore(bestScore.getAsInt());
+            if (bestAttempt != null) {
+                // Установим лучший результат
+                testDto.setBestScore(bestAttempt.getScore());
+
+                // Установим реальный максимальный балл из этой попытки
+                // Это будет максимальный возможный балл для ответов на вопросы,
+                // которые были выбраны для этой конкретной попытки
+                testDto.setMaxScore(bestAttempt.getMaxScore());
+            } else {
+                // Если попыток еще не было, устанавливаем максимальный балл из всех вопросов
+                testDto.setMaxScore(testDto.getTotalPoints());
             }
 
             // Вычислим кол-во оставшихся попыток
@@ -580,6 +589,9 @@ public class TestService {
             }
         }
 
+        // Set the maxScore correctly in the test result
+        testResult.setMaxScore(maxPossibleScore);
+
         // Process each answer
         for (StudentAnswerRequest answerRequest : request.getAnswers()) {
             Question question = questionMap.get(answerRequest.getQuestionId());
@@ -654,9 +666,6 @@ public class TestService {
             testResult.getStudentAnswers().add(studentAnswer);
         }
 
-        // Update testResult with the correct maxScore based on selected questions
-        testResult.setMaxScore(maxPossibleScore);
-
         // Mark test as completed
         testResult.setCompleted(true);
         testResult.setCompletedAt(LocalDateTime.now());
@@ -669,6 +678,7 @@ public class TestService {
         if (timeExpired) {
             resultDto.setMessage("Время выполнения теста истекло. Учтены только предоставленные ответы.");
         }
+
 
         return resultDto;
     }

@@ -112,9 +112,9 @@ const TestResultsList = () => {
 
     // Determine status class based on percentage
     const getStatusClass = (percentage) => {
-        if (percentage >= 80) return { color: '#4CAF50', text: 'Отлично' };
-        if (percentage >= 60) return { color: '#2196F3', text: 'Хорошо' };
-        if (percentage >= 40) return { color: '#FF9800', text: 'Удовлетворительно' };
+        if (percentage >= 90) return { color: '#4CAF50', text: 'Отлично' };
+        if (percentage >= 75) return { color: '#2196F3', text: 'Хорошо' };
+        if (percentage >= 60) return { color: '#FF9800', text: 'Удовлетворительно' };
         return { color: '#F44336', text: 'Неудовлетворительно' };
     };
 

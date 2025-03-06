@@ -126,7 +126,20 @@ const TestsList = () => {
 
     const renderTestCard = (test) => {
         const isActive = test.active !== false;
+        const calculatePercentage = (score, maxScore) => {
+            if (!score || !maxScore) return 0;
+            return Math.round((score / maxScore) * 100);
+        };
 
+        // Function to calculate grade from percentage
+        const calculateGrade = (score, maxScore) => {
+            const percentage = calculatePercentage(score, maxScore);
+
+            if (percentage >= 90) return '5 (отлично)';
+            if (percentage >= 75) return '4 (хорошо)';
+            if (percentage >= 60) return '3 (удовлетворительно)';
+            return '2 (неудовлетворительно)';
+        };
         return (
             <div
                 key={test.id}
@@ -161,22 +174,32 @@ const TestsList = () => {
                 {/* Добавленная информация для учеников */}
                 {user?.role === 'STUDENT' && (
                     <>
-                        {test.bestScore !== undefined && test.bestScore !== null && test.bestScore !== '' ? (
-                            <p style={{ color: test.bestScore > 0 ? '#2E7D32' : '#757575' }}>
-                                <strong>Лучший результат:</strong> {test.bestScore} из {test.totalPoints || '?'} баллов
-                            </p>
-                        ) : (
-                            <p style={{ color: '#1976D2' }}>
-                                <strong>Статус:</strong> Требуется пройти тест
-                            </p>
-                        )}
-                        {test.maxAttempts !== undefined && (
-                            <p>
-                                <strong>Попытки:</strong>
-                                {test.remainingAttempts !== undefined
-                                    ? `${test.remainingAttempts} из ${test.maxAttempts}`
-                                    : `${test.maxAttempts} максимум`}
-                            </p>
+                        {user?.role === 'STUDENT' && (
+                            <>
+                                {test.bestScore !== undefined && test.bestScore !== null && test.bestScore !== '' ? (
+                                    <div>
+                                        <p style={{ color: '#1976D2', fontWeight: 'bold', fontSize: '16px', margin: '8px 0' }}>
+                                            <strong>Оценка:</strong> {calculateGrade(test.bestScore, test.maxScore)}
+                                        </p>
+                                        <p style={{ color: '#2E7D32', margin: '8px 0' }}>
+                                            <strong>Результат:</strong> {test.bestScore} из {test.maxScore || test.totalPoints} баллов
+                                            ({calculatePercentage(test.bestScore, test.maxScore)}%)
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <p style={{ color: '#1976D2', margin: '8px 0' }}>
+                                        <strong>Статус:</strong> Требуется пройти тест
+                                    </p>
+                                )}
+                                {test.maxAttempts !== undefined && (
+                                    <p style={{ margin: '8px 0' }}>
+                                        <strong>Попытки:</strong>{' '}
+                                        {test.remainingAttempts !== undefined
+                                            ? `${test.maxAttempts - test.remainingAttempts} из ${test.maxAttempts}`
+                                            : `${test.maxAttempts} максимум`}
+                                    </p>
+                                )}
+                            </>
                         )}
                     </>
                 )}
