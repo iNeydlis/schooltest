@@ -42,4 +42,7 @@ public class StudentAnswer {
     private boolean isCorrect = false;
 
     private Integer earnedPoints = 0;
+    @Column(name = "partial_ratio")
+    private Double partialRatio;
+
 }

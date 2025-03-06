@@ -646,22 +646,72 @@ public class TestService {
                             if (selectedAnswers.size() == 1) {
                                 isCorrect = selectedAnswers.iterator().next().isCorrect();
                             }
-                        } else {
-                            // For multiple choice, all correct answers must be selected and no incorrect ones
-                            Set<Answer> correctAnswers = question.getAnswers().stream()
+                        } // Modified section of the multiple-choice scoring logic
+                        else if (question.getType() == QuestionType.MULTIPLE_CHOICE) {
+                            // For multiple choice, we calculate points proportionally
+                            Set<Answer> allQuestionAnswers = new HashSet<>(question.getAnswers());
+                            Set<Answer> correctQuestionAnswers = question.getAnswers().stream()
                                     .filter(Answer::isCorrect)
                                     .collect(Collectors.toSet());
 
-                            // Check if selected answers match exactly the correct answers
-                            isCorrect = selectedAnswers.equals(correctAnswers);
+                            if (correctQuestionAnswers.isEmpty()) {
+                                // If there are no correct answers, check if student selected nothing
+                                isCorrect = selectedAnswers.isEmpty();
+                            } else {
+                                // Count the student's correct and incorrect selections
+                                int totalCorrectAnswers = correctQuestionAnswers.size();
+
+                                // Correctly selected answers (true positive)
+                                int correctSelectedCount = 0;
+                                for (Answer selected : selectedAnswers) {
+                                    if (selected.isCorrect()) {
+                                        correctSelectedCount++;
+                                    }
+                                }
+
+                                // Incorrectly selected answers (false positive)
+                                int incorrectSelectedCount = selectedAnswers.size() - correctSelectedCount;
+
+                                // Calculate partial score - modified formula for fairer scoring
+                                double correctRatio = (double) correctSelectedCount / totalCorrectAnswers;
+
+                                // Calculate penalty for incorrect selections - proportional to the number of incorrect options
+                                int totalIncorrectOptions = allQuestionAnswers.size() - totalCorrectAnswers;
+                                double incorrectPenalty = totalIncorrectOptions > 0 ?
+                                        (double) incorrectSelectedCount / totalIncorrectOptions : 0;
+
+                                // Final ratio is the percentage of correct answers minus a penalty for incorrect selections
+                                // The penalty is scaled to ensure students don't get 0 for minor mistakes
+                                double ratio = Math.max(0, correctRatio - (incorrectPenalty * 0.5));
+
+                                // Set partial points
+                                int partialPoints = (int) Math.round(question.getPoints() * ratio);
+                                studentAnswer.setEarnedPoints(partialPoints);
+
+                                // Technically the answer is only fully correct if ratio == 1.0
+                                isCorrect = (ratio == 1.0);
+                                studentAnswer.setCorrect(isCorrect);
+
+                                // Store the ratio for reference
+                                studentAnswer.setPartialRatio(ratio);
+
+                                // Add points to total score
+                                totalScore += partialPoints;
+
+                                // Add student answer to the result and move to next question
+                                testResult.getStudentAnswers().add(studentAnswer);
+                                continue; // Skip standard scoring logic below
+                            }
                         }
                     }
                     break;
             }
 
-            studentAnswer.setCorrect(isCorrect);
-            studentAnswer.setEarnedPoints(isCorrect ? question.getPoints() : 0);
-            totalScore += studentAnswer.getEarnedPoints();
+            if (question.getType() != QuestionType.MULTIPLE_CHOICE || isCorrect) {
+                studentAnswer.setCorrect(isCorrect);
+                studentAnswer.setEarnedPoints(isCorrect ? question.getPoints() : 0);
+                totalScore += studentAnswer.getEarnedPoints();
+            }
 
             testResult.getStudentAnswers().add(studentAnswer);
         }
