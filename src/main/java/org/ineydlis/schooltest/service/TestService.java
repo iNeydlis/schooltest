@@ -141,10 +141,16 @@ public class TestService {
             // Найдем все попытки для этого теста и этого ученика
             List<TestResult> attempts = testResultRepository.findByTestAndStudent(test, student);
 
-            // Найдем лучшую попытку
+            // Найдем лучшую попытку по процентному соотношению (score/maxScore)
             TestResult bestAttempt = attempts.stream()
                     .filter(TestResult::isCompleted)
-                    .max(Comparator.comparing(TestResult::getScore))
+                    .max(Comparator.comparing(tr -> {
+                        // Избегаем деления на ноль
+                        if (tr.getMaxScore() == null || tr.getMaxScore() == 0) {
+                            return 0.0;
+                        }
+                        return tr.getScore() * 100.0 / tr.getMaxScore();
+                    }))
                     .orElse(null);
 
             if (bestAttempt != null) {
@@ -152,9 +158,14 @@ public class TestService {
                 testDto.setBestScore(bestAttempt.getScore());
 
                 // Установим реальный максимальный балл из этой попытки
-                // Это будет максимальный возможный балл для ответов на вопросы,
-                // которые были выбраны для этой конкретной попытки
                 testDto.setMaxScore(bestAttempt.getMaxScore());
+
+                // Добавим процентное значение для корректного отображения
+                if (bestAttempt.getMaxScore() != null && bestAttempt.getMaxScore() > 0) {
+                    testDto.setBestScorePercentage((double) bestAttempt.getScore() / bestAttempt.getMaxScore() * 100);
+                } else {
+                    testDto.setBestScorePercentage(0.0);
+                }
             } else {
                 // Если попыток еще не было, устанавливаем максимальный балл из всех вопросов
                 testDto.setMaxScore(testDto.getTotalPoints());

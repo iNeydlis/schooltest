@@ -33,7 +33,7 @@ public class TestDto {
     private Integer maxAttempts;
     private Integer bestScore; // Лучший результат ученика
     private Integer remainingAttempts; // Оставшиеся попытки
-
+    private Double bestScorePercentage; // Процент лучшего результата для правильного сравнения
 
     public static TestDto fromEntity(Test test) {
         return TestDto.builder()
@@ -61,6 +61,7 @@ public class TestDto {
                 .maxAttempts(test.getMaxAttempts())
                 .bestScore(null) // Значение по умолчанию или из другого источника
                 .remainingAttempts(null) // Значение по умолчанию или из другого источника
+                .bestScorePercentage(null) // Будет заполнено в методе getTestsForStudent
                 .build();
     }
 }
