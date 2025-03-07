@@ -77,6 +77,10 @@ public class TestController {
             @RequestHeader("Authorization") String token) {
         User currentUser = authService.getCurrentUser(token);
 
+        if (currentUser.getRole() == UserRole.STUDENT) {
+            throw new RuntimeException("У вас нет прав на просмотр деталей результата теста");
+        }
+
         // Получаем детали результата теста, включая ответы студента
         TestResultDetailsDto resultDetails = testService.getTestResultDetails(resultId, currentUser.getId());
         return ResponseEntity.ok(resultDetails);
