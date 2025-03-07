@@ -57,4 +57,13 @@ public class User {
 
     // Токен для сохранения сессии
     private String token;
+
+
+    @ManyToMany
+    @JoinTable(
+            name = "teacher_teaching_grade",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "grade_id")
+    )
+    private Set<Grade> teachingGrades = new HashSet<>();
 }

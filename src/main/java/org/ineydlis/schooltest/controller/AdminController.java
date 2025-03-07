@@ -40,6 +40,7 @@ public class AdminController {
         return ResponseEntity.ok(userRepository.findAll());
     }
 
+    // Modify AdminController.java - createUser method
     @PostMapping("/users")
     public ResponseEntity<User> createUser(@RequestBody UserDto userDto) {
         User user = new User();
@@ -59,13 +60,26 @@ public class AdminController {
         }
 
         // Установка предметов для учителя
-        if (userDto.getRole() == UserRole.TEACHER && userDto.getSubjectNames() != null) {
-            Set<Subject> subjects = new HashSet<>();
-            for (String subjectName : userDto.getSubjectNames()) {
-                Optional<Subject> subject = subjectRepository.findByName(subjectName);
-                subject.ifPresent(subjects::add);
+        if (userDto.getRole() == UserRole.TEACHER) {
+            // Assign subjects
+            if (userDto.getSubjectNames() != null) {
+                Set<Subject> subjects = new HashSet<>();
+                for (String subjectName : userDto.getSubjectNames()) {
+                    Optional<Subject> subject = subjectRepository.findByName(subjectName);
+                    subject.ifPresent(subjects::add);
+                }
+                user.setSubjects(subjects);
             }
-            user.setSubjects(subjects);
+
+            // Assign grades (classes) that the teacher teaches
+            if (userDto.getTeachingGradeNames() != null) {
+                Set<Grade> teachingGrades = new HashSet<>();
+                for (String gradeName : userDto.getTeachingGradeNames()) {
+                    Optional<Grade> grade = gradeRepository.findByFullName(gradeName);
+                    grade.ifPresent(teachingGrades::add);
+                }
+                user.setTeachingGrades(teachingGrades);
+            }
         }
 
         return ResponseEntity.ok(userRepository.save(user));
@@ -92,6 +106,7 @@ public class AdminController {
         // Сбросить предыдущие связи
         user.setGrade(null);
         user.setSubjects(new HashSet<>());
+        user.setTeachingGrades(new HashSet<>()); // Reset teaching grades
 
         // Установка класса для ученика
         if (userDto.getRole() == UserRole.STUDENT && userDto.getGradeName() != null) {
@@ -101,14 +116,27 @@ public class AdminController {
             }
         }
 
-        // Установка предметов для учителя
-        if (userDto.getRole() == UserRole.TEACHER && userDto.getSubjectNames() != null) {
-            Set<Subject> subjects = new HashSet<>();
-            for (String subjectName : userDto.getSubjectNames()) {
-                Optional<Subject> subject = subjectRepository.findByName(subjectName);
-                subject.ifPresent(subjects::add);
+        // Установка предметов и классов для учителя
+        if (userDto.getRole() == UserRole.TEACHER) {
+            // Assign subjects
+            if (userDto.getSubjectNames() != null) {
+                Set<Subject> subjects = new HashSet<>();
+                for (String subjectName : userDto.getSubjectNames()) {
+                    Optional<Subject> subject = subjectRepository.findByName(subjectName);
+                    subject.ifPresent(subjects::add);
+                }
+                user.setSubjects(subjects);
             }
-            user.setSubjects(subjects);
+
+            // Assign grades (classes) that the teacher teaches
+            if (userDto.getTeachingGradeNames() != null) {
+                Set<Grade> teachingGrades = new HashSet<>();
+                for (String gradeName : userDto.getTeachingGradeNames()) {
+                    Optional<Grade> grade = gradeRepository.findByFullName(gradeName);
+                    grade.ifPresent(teachingGrades::add);
+                }
+                user.setTeachingGrades(teachingGrades);
+            }
         }
 
         return ResponseEntity.ok(userRepository.save(user));

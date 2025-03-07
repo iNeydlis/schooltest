@@ -9,16 +9,42 @@ const UserForm = ({ user, grades, subjects, onSubmit, onCancel }) => {
         role: 'STUDENT',
         gradeName: '',
         subjectNames: [],
+        teachingGradeNames: [],
         active: true
     });
     const [errors, setErrors] = useState({});
 
     useEffect(() => {
         if (user) {
-            // Если редактируем существующего пользователя
+            // Для ученика: gradeName - строка с именем класса
+            const gradeName = user.gradeName || (user.grade ? user.grade.fullName : '');
+
+            // Для учителя: массивы имен предметов и классов
+            let subjectNames = [];
+            if (user.subjectNames && user.subjectNames.length > 0) {
+                subjectNames = [...user.subjectNames];
+            } else if (user.subjects && user.subjects.length > 0) {
+                subjectNames = user.subjects.map(subject => subject.name);
+            }
+
+            let teachingGradeNames = [];
+            if (user.teachingGradeNames && user.teachingGradeNames.length > 0) {
+                teachingGradeNames = [...user.teachingGradeNames];
+            } else if (user.teachingGrades && user.teachingGrades.length > 0) {
+                teachingGradeNames = user.teachingGrades.map(grade => grade.fullName);
+            }
+
             setFormData({
-                ...user,
+                id: user.id,
+                username: user.username || '',
                 password: '', // Пароль не передаем для редактирования
+                fullName: user.fullName || '',
+                email: user.email || '',
+                role: user.role || 'STUDENT',
+                gradeName: gradeName,
+                subjectNames: subjectNames,
+                teachingGradeNames: teachingGradeNames,
+                active: user.active !== undefined ? user.active : true
             });
         }
     }, [user]);
@@ -45,6 +71,11 @@ const UserForm = ({ user, grades, subjects, onSubmit, onCancel }) => {
             newErrors.subjectNames = 'Выберите хотя бы один предмет для учителя';
         }
 
+        // Проверяем выбор классов для учителя
+        if (formData.role === 'TEACHER' && (!formData.teachingGradeNames || formData.teachingGradeNames.length === 0)) {
+            newErrors.teachingGradeNames = 'Выберите хотя бы один класс для учителя';
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -61,11 +92,11 @@ const UserForm = ({ user, grades, subjects, onSubmit, onCancel }) => {
         // При смене роли, сбрасываем связанные поля
         if (name === 'role') {
             if (value === 'STUDENT') {
-                setFormData(prev => ({ ...prev, role: value, subjectNames: [] }));
+                setFormData(prev => ({ ...prev, role: value, subjectNames: [], teachingGradeNames: [] }));
             } else if (value === 'TEACHER') {
                 setFormData(prev => ({ ...prev, role: value, gradeName: '' }));
             } else {
-                setFormData(prev => ({ ...prev, role: value, gradeName: '', subjectNames: [] }));
+                setFormData(prev => ({ ...prev, role: value, gradeName: '', subjectNames: [], teachingGradeNames: [] }));
             }
         }
     };
@@ -83,10 +114,33 @@ const UserForm = ({ user, grades, subjects, onSubmit, onCancel }) => {
         });
     };
 
+    const handleGradeChange = (e) => {
+        const gradeName = e.target.value;
+        const isChecked = e.target.checked;
+
+        setFormData(prev => {
+            // Важно: создаем новый массив, не изменяя существующий
+            const updatedGrades = isChecked
+                ? [...prev.teachingGradeNames, gradeName]
+                : prev.teachingGradeNames.filter(name => name !== gradeName);
+
+            return { ...prev, teachingGradeNames: updatedGrades };
+        });
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (validateForm()) {
-            onSubmit(formData);
+            // Убедимся, что teachingGradeNames - это массив строк
+            const submitData = {
+                id: user ? user.id : undefined,
+                ...formData,
+                teachingGradeNames: Array.isArray(formData.teachingGradeNames)
+                    ? [...formData.teachingGradeNames]
+                    : []
+            };
+
+            onSubmit(submitData);
         }
     };
 
@@ -191,30 +245,57 @@ const UserForm = ({ user, grades, subjects, onSubmit, onCancel }) => {
                 )}
 
                 {formData.role === 'TEACHER' && (
-                    <div className="form-group">
-                        <label>Предметы</label>
-                        <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                            gap: '0.5rem',
-                            marginTop: '0.5rem'
-                        }}>
-                            {subjects && subjects.map(subject => (
-                                <div key={subject.id} style={{ display: 'flex', alignItems: 'center' }}>
-                                    <input
-                                        type="checkbox"
-                                        id={`subject-${subject.id}`}
-                                        value={subject.name}
-                                        checked={formData.subjectNames.includes(subject.name)}
-                                        onChange={handleSubjectChange}
-                                        style={{ marginRight: '0.5rem' }}
-                                    />
-                                    <label htmlFor={`subject-${subject.id}`}>{subject.name}</label>
-                                </div>
-                            ))}
+                    <>
+                        <div className="form-group">
+                            <label>Предметы</label>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                                gap: '0.5rem',
+                                marginTop: '0.5rem'
+                            }}>
+                                {subjects && subjects.map(subject => (
+                                    <div key={subject.id} style={{ display: 'flex', alignItems: 'center' }}>
+                                        <input
+                                            type="checkbox"
+                                            id={`subject-${subject.id}`}
+                                            value={subject.name}
+                                            checked={formData.subjectNames.includes(subject.name)}
+                                            onChange={handleSubjectChange}
+                                            style={{ marginRight: '0.5rem' }}
+                                        />
+                                        <label htmlFor={`subject-${subject.id}`}>{subject.name}</label>
+                                    </div>
+                                ))}
+                            </div>
+                            {errors.subjectNames && <div style={{ color: 'red' }}>{errors.subjectNames}</div>}
                         </div>
-                        {errors.subjectNames && <div style={{ color: 'red' }}>{errors.subjectNames}</div>}
-                    </div>
+
+                        <div className="form-group">
+                            <label>Преподаваемые классы</label>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                                gap: '0.5rem',
+                                marginTop: '0.5rem'
+                            }}>
+                                {grades && grades.map(grade => (
+                                    <div key={grade.id} style={{ display: 'flex', alignItems: 'center' }}>
+                                        <input
+                                            type="checkbox"
+                                            id={`grade-${grade.id}`}
+                                            value={grade.fullName}
+                                            checked={formData.teachingGradeNames.includes(grade.fullName)}
+                                            onChange={handleGradeChange}
+                                            style={{ marginRight: '0.5rem' }}
+                                        />
+                                        <label htmlFor={`grade-${grade.id}`}>{grade.fullName}</label>
+                                    </div>
+                                ))}
+                            </div>
+                            {errors.teachingGradeNames && <div style={{ color: 'red' }}>{errors.teachingGradeNames}</div>}
+                        </div>
+                    </>
                 )}
 
                 <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

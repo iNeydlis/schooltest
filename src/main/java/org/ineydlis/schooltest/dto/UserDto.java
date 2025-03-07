@@ -3,6 +3,7 @@ package org.ineydlis.schooltest.dto;
 import lombok.Data;
 import org.ineydlis.schooltest.model.UserRole;
 
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -16,4 +17,5 @@ public class UserDto {
     private String gradeName; // Изменено: теперь это имя класса (например, "1А")
     private Set<String> subjectNames; // Изменено: теперь это набор имён предметов
     private boolean active;
+    private List<String> teachingGradeNames;
 }

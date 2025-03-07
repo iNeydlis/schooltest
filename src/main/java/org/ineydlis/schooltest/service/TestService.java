@@ -48,6 +48,28 @@ public class TestService {
             if (!canTeach) {
                 throw new RuntimeException("Вы не можете создавать тесты по данному предмету");
             }
+
+            // Verify that teacher is assigned to at least one of the specified grades
+            if (request.getGradeIds() != null && !request.getGradeIds().isEmpty()) {
+                boolean hasPermissionForGrades = false;
+
+                // Get the set of grade IDs the teacher is assigned to
+                Set<Long> teacherGradeIds = creator.getTeachingGrades().stream()
+                        .map(Grade::getId)
+                        .collect(Collectors.toSet());
+
+                // Check if there's an overlap between requested grades and teacher's assigned grades
+                for (Long gradeId : request.getGradeIds()) {
+                    if (teacherGradeIds.contains(gradeId)) {
+                        hasPermissionForGrades = true;
+                        break;
+                    }
+                }
+
+                if (!hasPermissionForGrades) {
+                    throw new RuntimeException("Вы не можете создавать тесты для указанных классов, так как не являетесь преподавателем в этих классах");
+                }
+            }
         } else if (creator.getRole() != UserRole.ADMIN) {
             throw new RuntimeException("У вас нет прав на создание тестов");
         }

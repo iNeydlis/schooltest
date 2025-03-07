@@ -88,8 +88,8 @@ const AdminPanel = () => {
             role: userData.role,
             gradeName: userData.grade ? userData.grade.fullName : null,
             subjectNames: userData.subjects ? userData.subjects.map(s => s.name) : [],
+            teachingGradeNames: userData.teachingGrades ? userData.teachingGrades.map(g => g.fullName) : [], // Добавьте эту строку
             active: userData.active
-            // Не включаем пароль, он будет добавлен в форме если нужно
         };
 
         setEditingUser(userDtoData);
@@ -127,8 +127,9 @@ const AdminPanel = () => {
                 fullName: formData.fullName,
                 email: formData.email,
                 role: formData.role,
-                gradeName: formData.gradeName || null,  // Имя класса вместо объекта
-                subjectNames: formData.subjectNames || [],  // Имена предметов вместо объектов
+                gradeName: formData.gradeName || null,
+                subjectNames: formData.subjectNames || [],
+                teachingGradeNames: formData.teachingGradeNames || [], // Добавьте эту строку
                 active: formData.active
             };
 
