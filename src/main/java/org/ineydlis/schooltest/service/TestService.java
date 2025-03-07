@@ -291,11 +291,15 @@ public class TestService {
 
         // Update available grades
         if (request.getGradeIds() != null) {
+            // Явно очищаем список классов
+            test.getAvailableGrades().clear();
+
+            // Затем добавляем новые
             Set<Grade> grades = request.getGradeIds().stream()
                     .map(id -> gradeRepository.findById(id)
                             .orElseThrow(() -> new RuntimeException("Класс не найден: " + id)))
                     .collect(Collectors.toSet());
-            test.setAvailableGrades(grades);
+            test.getAvailableGrades().addAll(grades);
         }
 
         // Update questions (remove existing and add new)

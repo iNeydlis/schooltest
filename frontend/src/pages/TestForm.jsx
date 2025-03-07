@@ -65,20 +65,34 @@ const TestForm = () => {
                     const response = await TestService.getTestById(testId, true);
                     const testData = response.data || response;
 
+                    console.log('Test data for editing:', testData);
+
                     if (!testData.questions || testData.questions.length === 0) {
-                        // If no questions are returned, the user likely doesn't have permission
                         setError("У вас нет доступа к редактированию вопросов этого теста");
-                        navigate('/tests'); // Redirect back to tests list
+                        navigate('/tests');
                         return;
                     }
+
+                    // Обработка классов
+                    let gradeIds = [];
+                    if (testData.availableGrades) {
+                        gradeIds = testData.availableGrades.map(grade => {
+                            if (typeof grade === 'number') return grade;
+                            if (typeof grade === 'object' && grade !== null) return grade.id;
+                            if (typeof grade === 'string') return grade; // Store the string as is
+                            console.log('Неизвестный формат grade:', grade);
+                            return null;
+                        }).filter(id => id !== null);
+                    }
+
+                    console.log('Processed grade IDs:', gradeIds);
 
                     setFormData({
                         title: testData.title,
                         description: testData.description || '',
                         subjectId: testData.subject?.id || testData.subjectId,
                         timeLimit: testData.timeLimit || 60,
-                        gradeIds: (testData.availableGrades || []).map(grade =>
-                            typeof grade === 'object' ? grade.id : grade),
+                        gradeIds: gradeIds,
                         questions: (testData.questions || []).map(q => {
                             // Ensure TEXT_ANSWER questions have at least one answer
                             if (q.type === 'TEXT_ANSWER' && (!q.answers || q.answers.length === 0)) {
@@ -115,17 +129,28 @@ const TestForm = () => {
         }));
     };
 
+
     const handleGradeChange = (e) => {
         const gradeId = parseInt(e.target.value);
         const isChecked = e.target.checked;
 
         setFormData(prev => {
-            let updatedGradeIds = [...prev.gradeIds];
+            const currentGradeIds = [...prev.gradeIds];
 
-            if (isChecked && !updatedGradeIds.includes(gradeId)) {
-                updatedGradeIds.push(gradeId);
-            } else if (!isChecked) {
-                updatedGradeIds = updatedGradeIds.filter(id => id !== gradeId);
+            let updatedGradeIds;
+            if (isChecked) {
+                // Always add as a number, not a string
+                updatedGradeIds = [...currentGradeIds, gradeId];
+            } else {
+                // Remove the ID whether it's a number or matching string
+                updatedGradeIds = currentGradeIds.filter(id => {
+                    if (typeof id === 'number') return id !== gradeId;
+                    if (typeof id === 'string' && !isNaN(parseInt(id))) return parseInt(id) !== gradeId;
+
+                    // For string names, check if this grade's name/fullName matches
+                    const matchedGrade = grades.find(g => g.id === gradeId);
+                    return id !== matchedGrade?.name && id !== matchedGrade?.fullName;
+                });
             }
 
             return {
@@ -133,6 +158,35 @@ const TestForm = () => {
                 gradeIds: updatedGradeIds
             };
         });
+    };
+    const isGradeSelected = (grade) => {
+        // Check if this grade's ID is in our gradeIds array (as number)
+        if (formData.gradeIds.includes(grade.id)) {
+            return true;
+        }
+
+        // Check if this grade's ID is in our gradeIds array (as string)
+        if (formData.gradeIds.includes(String(grade.id))) {
+            return true;
+        }
+
+        // Check if this grade's name or fullName is in our gradeIds array
+        if (formData.gradeIds.includes(grade.name) || formData.gradeIds.includes(grade.fullName)) {
+            return true;
+        }
+
+        // For numeric ID stored as strings
+        const numericIds = formData.gradeIds
+            .filter(id => typeof id === 'string')
+            .map(id => parseInt(id))
+            .filter(id => !isNaN(id));
+
+        if (numericIds.includes(grade.id)) {
+            return true;
+        }
+
+        // Not found in any format
+        return false;
     };
 
     const handleQuestionChange = (index, field, value) => {
@@ -292,13 +346,21 @@ const TestForm = () => {
                     }
                 }
             }
+            const numericGradeIds = formData.gradeIds.map(id => {
+                if (typeof id === 'number') return id;
+                if (typeof id === 'string' && !isNaN(parseInt(id))) return parseInt(id);
+
+                // Поиск ID по имени класса
+                const matchingGrade = grades.find(g => g.fullName === id || g.name === id);
+                return matchingGrade ? matchingGrade.id : null;
+            }).filter(id => id !== null); // Удаляем все null значения
 
             const testCreateRequest = {
                 title: formData.title,
                 subjectId: parseInt(formData.subjectId),
                 description: formData.description,
                 timeLimit: parseInt(formData.timeLimit),
-                gradeIds: formData.gradeIds,
+                gradeIds: numericGradeIds,
                 questions: formData.questions.map(q => ({
                     text: q.text,
                     type: q.type,
@@ -417,7 +479,7 @@ const TestForm = () => {
                                             <input
                                                 type="checkbox"
                                                 value={grade.id}
-                                                checked={formData.gradeIds.includes(grade.id)}
+                                                checked={isGradeSelected(grade)}
                                                 onChange={handleGradeChange}
                                             />
                                             {' ' + grade.fullName}

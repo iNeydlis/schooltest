@@ -53,7 +53,7 @@ public class Test {
     private Integer questionsToShow;
 
     // Grades that can access this test
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "test_grades",
             joinColumns = @JoinColumn(name = "test_id"),
