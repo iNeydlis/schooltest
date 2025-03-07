@@ -23,11 +23,20 @@ public class QuestionDto {
     private List<AnswerDto> answers;
 
     public static QuestionDto fromEntity(Question question, boolean includeCorrectAnswers) {
-        // Для вопросов типа TEXT_ANSWER не передаем никаких ответов
         List<AnswerDto> processedAnswers;
+
         if (question.getType() == QuestionType.TEXT_ANSWER) {
-            processedAnswers = Collections.emptyList();
+            if (includeCorrectAnswers) {
+                // For teachers/admins - show the correct text answer
+                processedAnswers = question.getAnswers().stream()
+                        .map(answer -> AnswerDto.fromEntity(answer, true))
+                        .collect(Collectors.toList());
+            } else {
+                // For students - hide the answers
+                processedAnswers = Collections.emptyList();
+            }
         } else {
+            // For other question types, proceed as before
             processedAnswers = question.getAnswers().stream()
                     .map(answer -> AnswerDto.fromEntity(answer, includeCorrectAnswers))
                     .collect(Collectors.toList());

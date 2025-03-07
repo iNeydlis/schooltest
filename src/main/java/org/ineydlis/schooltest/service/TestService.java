@@ -207,7 +207,6 @@ public class TestService {
         return testDtos;
     }
 
-    // Get test details with questions
     // Update getTestWithQuestions method in your backend
     public TestDto getTestWithQuestions(Long testId, Long userId, boolean includeAnswers) {
         Test test = testRepository.findById(testId)
@@ -266,48 +265,38 @@ public class TestService {
             throw new RuntimeException("У вас нет прав на редактирование тестов");
         }
 
-        // Update test fields
+        // Delete test results
+        List<TestResult> results = testResultRepository.findByTest(test);
+        testResultRepository.deleteAll(results);
+
+        // Update test properties instead of recreating
         test.setTitle(request.getTitle());
         test.setDescription(request.getDescription());
         test.setTimeLimit(request.getTimeLimit());
-        test.setUpdatedAt(LocalDateTime.now());
         test.setQuestionsToShow(request.getQuestionsToShow());
+        test.setUpdatedAt(LocalDateTime.now());
 
-        // Update subject if changed and user has permission
-        if (!test.getSubject().getId().equals(request.getSubjectId())) {
-            Subject subject = subjectRepository.findById(request.getSubjectId())
-                    .orElseThrow(() -> new RuntimeException("Предмет не найден"));
+        // Update subject
+        Subject subject = subjectRepository.findById(request.getSubjectId())
+                .orElseThrow(() -> new RuntimeException("Предмет не найден"));
+        test.setSubject(subject);
 
-            if (user.getRole() == UserRole.TEACHER) {
-                boolean canTeach = user.getSubjects().stream()
-                        .anyMatch(s -> s.getId().equals(subject.getId()));
-                if (!canTeach) {
-                    throw new RuntimeException("Вы не можете создавать тесты по данному предмету");
-                }
-            }
-
-            test.setSubject(subject);
-        }
-
-        // Update available grades
+        // Update grades
         if (request.getGradeIds() != null) {
-            // Явно очищаем список классов
             test.getAvailableGrades().clear();
-
-            // Затем добавляем новые
             Set<Grade> grades = request.getGradeIds().stream()
                     .map(id -> gradeRepository.findById(id)
                             .orElseThrow(() -> new RuntimeException("Класс не найден: " + id)))
                     .collect(Collectors.toSet());
-            test.getAvailableGrades().addAll(grades);
+            test.setAvailableGrades(grades);
         }
 
-        // Update questions (remove existing and add new)
-        if (request.getQuestions() != null) {
-            // Remove existing questions
-            test.getQuestions().clear();
+        // Clear and update questions
+        questionRepository.deleteAll(test.getQuestions());
+        test.getQuestions().clear();
 
-            // Add new questions
+        // Add new questions
+        if (request.getQuestions() != null) {
             for (QuestionDto questionDto : request.getQuestions()) {
                 Question question = new Question();
                 question.setText(questionDto.getText());
@@ -315,7 +304,7 @@ public class TestService {
                 question.setPoints(questionDto.getPoints());
                 question.setTest(test);
 
-                // Add answers
+                // Create answers
                 if (questionDto.getAnswers() != null) {
                     for (AnswerDto answerDto : questionDto.getAnswers()) {
                         Answer answer = new Answer();
@@ -325,13 +314,13 @@ public class TestService {
                         question.getAnswers().add(answer);
                     }
                 }
-
                 test.getQuestions().add(question);
             }
         }
 
-        testRepository.save(test);
-        return TestDto.fromEntity(test);
+        // Save and return
+        Test savedTest = testRepository.save(test);
+        return TestDto.fromEntity(savedTest);
     }
     @Transactional
     public void permanentlyDeleteTest(Long testId, Long userId) {
