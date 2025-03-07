@@ -15,7 +15,9 @@ const TestForm = () => {
         subjectId: '',
         timeLimit: 60,
         gradeIds: [],
-        questions: []
+        questions: [],
+        maxAttempts: 1,         // Added maxAttempts field
+        questionsToShow: null   // Added questionsToShow field
     });
 
     const [subjects, setSubjects] = useState([]);
@@ -104,7 +106,9 @@ const TestForm = () => {
                                 };
                             }
                             return q;
-                        })
+                        }),
+                        maxAttempts: testData.maxAttempts || 1,
+                        questionsToShow: testData.questionsToShow || null
                     });
                 } catch (err) {
                     const errorMsg = err.response?.data?.message || err.message;
@@ -313,6 +317,22 @@ const TestForm = () => {
                 throw new Error('Тест должен содержать хотя бы один вопрос');
             }
 
+            // Validate maxAttempts
+            if (formData.maxAttempts < 1) {
+                throw new Error('Количество попыток должно быть не менее 1');
+            }
+
+            // Validate questionsToShow if provided
+            if (formData.questionsToShow !== null && formData.questionsToShow !== '') {
+                const questionsToShowNum = parseInt(formData.questionsToShow);
+                if (isNaN(questionsToShowNum) || questionsToShowNum < 1) {
+                    throw new Error('Количество отображаемых вопросов должно быть положительным числом');
+                }
+                if (questionsToShowNum > formData.questions.length) {
+                    throw new Error('Количество отображаемых вопросов не может быть больше общего количества вопросов');
+                }
+            }
+
             for (const [qIndex, question] of formData.questions.entries()) {
                 if (!question.text.trim()) {
                     throw new Error(`Вопрос #${qIndex + 1} не содержит текста`);
@@ -355,12 +375,19 @@ const TestForm = () => {
                 return matchingGrade ? matchingGrade.id : null;
             }).filter(id => id !== null); // Удаляем все null значения
 
+            // Prepare questions to show (convert empty string or null to undefined for backend)
+            const questionsToShow = formData.questionsToShow && formData.questionsToShow !== ''
+                ? parseInt(formData.questionsToShow)
+                : undefined;
+
             const testCreateRequest = {
                 title: formData.title,
                 subjectId: parseInt(formData.subjectId),
                 description: formData.description,
                 timeLimit: parseInt(formData.timeLimit),
                 gradeIds: numericGradeIds,
+                maxAttempts: parseInt(formData.maxAttempts),
+                questionsToShow: questionsToShow,
                 questions: formData.questions.map(q => ({
                     text: q.text,
                     type: q.type,
@@ -467,6 +494,41 @@ const TestForm = () => {
                             onChange={handleChange}
                             className="form-control"
                         />
+                    </div>
+
+                    {/* Added maxAttempts field */}
+                    <div className="form-group">
+                        <label htmlFor="maxAttempts">Количество разрешенных попыток</label>
+                        <input
+                            id="maxAttempts"
+                            name="maxAttempts"
+                            type="number"
+                            min="1"
+                            value={formData.maxAttempts}
+                            onChange={handleChange}
+                            className="form-control"
+                        />
+                        <small className="form-text text-muted">
+                            Сколько раз студенты могут попытаться пройти этот тест
+                        </small>
+                    </div>
+
+                    {/* Added questionsToShow field */}
+                    <div className="form-group">
+                        <label htmlFor="questionsToShow">Количество отображаемых вопросов</label>
+                        <input
+                            id="questionsToShow"
+                            name="questionsToShow"
+                            type="number"
+                            min="1"
+                            max={formData.questions.length}
+                            value={formData.questionsToShow || ''}
+                            onChange={handleChange}
+                            className="form-control"
+                        />
+                        <small className="form-text text-muted">
+                            Оставьте пустым, чтобы показывать все вопросы. При указании значения вопросы будут выбираться случайным образом.
+                        </small>
                     </div>
 
                     <div className="form-group">

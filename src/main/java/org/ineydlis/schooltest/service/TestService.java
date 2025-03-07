@@ -83,6 +83,7 @@ public class TestService {
         test.setCreatedAt(LocalDateTime.now());
         test.setTimeLimit(request.getTimeLimit());
         test.setQuestionsToShow(request.getQuestionsToShow());
+        test.setMaxAttempts(request.getMaxAttempts());
 
         // Add available grades
         if (request.getGradeIds() != null && !request.getGradeIds().isEmpty()) {
@@ -274,6 +275,7 @@ public class TestService {
         test.setDescription(request.getDescription());
         test.setTimeLimit(request.getTimeLimit());
         test.setQuestionsToShow(request.getQuestionsToShow());
+        test.setMaxAttempts(request.getMaxAttempts());
         test.setUpdatedAt(LocalDateTime.now());
 
         // Update subject

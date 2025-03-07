@@ -168,7 +168,7 @@ const TestsList = () => {
                 </div>
                 <p><strong>Предмет:</strong> {test.subjectName?.name || test.subjectName || 'Не указан'}</p>
                 <p><strong>Описание:</strong> {test.description || 'Нет описания'}</p>
-                <p><strong>Вопросов:</strong> {test.questionCount || '0'}</p>
+                <p><strong>Вопросов:</strong> {(test.questionsToShow && test.questionsToShow >= 1) ? test.questionsToShow : test.questionCount || '0'}</p>
                 <p><strong>Макс. попыток:</strong> {test.maxAttempts || '1'}</p>
 
                 {/* Добавленная информация для учеников */}
