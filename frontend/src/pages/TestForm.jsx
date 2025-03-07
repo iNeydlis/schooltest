@@ -8,6 +8,7 @@ const TestForm = () => {
     const navigate = useNavigate();
     const isEditing = !!testId;
 
+
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -61,7 +62,6 @@ const TestForm = () => {
             const fetchTest = async () => {
                 try {
                     setLoading(true);
-                    // Make sure to request with includeAnswers=true for teachers
                     const response = await TestService.getTestById(testId, true);
                     const testData = response.data || response;
 
@@ -78,9 +78,12 @@ const TestForm = () => {
                     if (testData.availableGrades) {
                         gradeIds = testData.availableGrades.map(grade => {
                             if (typeof grade === 'number') return grade;
-                            if (typeof grade === 'object' && grade !== null) return grade.id;
-                            if (typeof grade === 'string') return grade; // Store the string as is
-                            console.log('Неизвестный формат grade:', grade);
+                            if (typeof grade === 'string') {
+                                // Предполагаем, что строка — это fullName, ищем соответствующий id
+                                const matchingGrade = grades.find(g => g.fullName === grade || g.name === grade);
+                                return matchingGrade ? matchingGrade.id : null;
+                            }
+                            if (typeof grade === 'object' && grade !== null && grade.id) return grade.id;
                             return null;
                         }).filter(id => id !== null);
                     }
@@ -94,7 +97,6 @@ const TestForm = () => {
                         timeLimit: testData.timeLimit || 60,
                         gradeIds: gradeIds,
                         questions: (testData.questions || []).map(q => {
-                            // Ensure TEXT_ANSWER questions have at least one answer
                             if (q.type === 'TEXT_ANSWER' && (!q.answers || q.answers.length === 0)) {
                                 return {
                                     ...q,
@@ -107,8 +109,6 @@ const TestForm = () => {
                 } catch (err) {
                     const errorMsg = err.response?.data?.message || err.message;
                     setError("Ошибка при загрузке теста: " + errorMsg);
-
-                    // If unauthorized or forbidden, redirect back
                     if (err.response?.status === 401 || err.response?.status === 403) {
                         navigate('/tests');
                     }
@@ -119,7 +119,7 @@ const TestForm = () => {
 
             fetchTest();
         }
-    }, [testId, isEditing, navigate]);
+    }, [testId, isEditing, navigate, grades]); // Добавляем grades в зависимости
 
     const handleChange = (e) => {
         const { name, value } = e.target;
