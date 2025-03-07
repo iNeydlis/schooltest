@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.ineydlis.schooltest.model.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -34,6 +35,7 @@ public class TestDto {
     private Integer bestScore; // Лучший результат ученика
     private Integer remainingAttempts; // Оставшиеся попытки
     private Double bestScorePercentage; // Процент лучшего результата для правильного сравнения
+    private List<QuestionDto> questions;
 
     public static TestDto fromEntity(Test test) {
         return TestDto.builder()

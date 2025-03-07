@@ -208,6 +208,7 @@ public class TestService {
     }
 
     // Get test details with questions
+    // Update getTestWithQuestions method in your backend
     public TestDto getTestWithQuestions(Long testId, Long userId, boolean includeAnswers) {
         Test test = testRepository.findById(testId)
                 .orElseThrow(() -> new RuntimeException("Тест не найден"));
@@ -236,8 +237,15 @@ public class TestService {
 
         TestDto testDto = TestDto.fromEntity(test);
 
-        // Add questions
-        testDto.setQuestionCount(test.getQuestions().size());
+        // Add questions if requested and user has appropriate permissions
+        if (includeAnswers && (user.getRole() == UserRole.TEACHER || user.getRole() == UserRole.ADMIN)) {
+            testDto.setQuestions(test.getQuestions().stream()
+                    .map(q -> QuestionDto.fromEntity(q, true))
+                    .collect(Collectors.toList()));
+        } else {
+            // Just set the question count
+            testDto.setQuestionCount(test.getQuestions().size());
+        }
 
         return testDto;
     }

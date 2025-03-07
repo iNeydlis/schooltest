@@ -44,15 +44,24 @@ const TestForm = () => {
             const fetchTest = async () => {
                 try {
                     setLoading(true);
+                    // Make sure to request with includeAnswers=true for teachers
                     const response = await TestService.getTestById(testId, true);
                     const testData = response.data || response;
+
+                    if (!testData.questions || testData.questions.length === 0) {
+                        // If no questions are returned, the user likely doesn't have permission
+                        setError("У вас нет доступа к редактированию вопросов этого теста");
+                        navigate('/tests'); // Redirect back to tests list
+                        return;
+                    }
 
                     setFormData({
                         title: testData.title,
                         description: testData.description || '',
                         subjectId: testData.subject?.id || testData.subjectId,
                         timeLimit: testData.timeLimit || 60,
-                        gradeIds: (testData.availableGrades || []).map(grade => grade.id || grade),
+                        gradeIds: (testData.availableGrades || []).map(grade =>
+                            typeof grade === 'object' ? grade.id : grade),
                         questions: (testData.questions || []).map(q => {
                             // Ensure TEXT_ANSWER questions have at least one answer
                             if (q.type === 'TEXT_ANSWER' && (!q.answers || q.answers.length === 0)) {
@@ -65,7 +74,13 @@ const TestForm = () => {
                         })
                     });
                 } catch (err) {
-                    setError("Ошибка при загрузке теста: " + (err.response?.data?.message || err.message));
+                    const errorMsg = err.response?.data?.message || err.message;
+                    setError("Ошибка при загрузке теста: " + errorMsg);
+
+                    // If unauthorized or forbidden, redirect back
+                    if (err.response?.status === 401 || err.response?.status === 403) {
+                        navigate('/tests');
+                    }
                 } finally {
                     setLoading(false);
                 }
@@ -73,7 +88,7 @@ const TestForm = () => {
 
             fetchTest();
         }
-    }, [testId, isEditing]);
+    }, [testId, isEditing, navigate]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
