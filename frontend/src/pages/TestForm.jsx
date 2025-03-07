@@ -25,12 +25,10 @@ const TestForm = () => {
         const fetchSubjectsAndGrades = async () => {
             try {
                 setLoading(true);
-                const [subjectsResponse, gradesResponse] = await Promise.all([
-                    TestService.getAllSubjects(),
-                    TestService.getAllGrades()
-                ]);
-                setSubjects(subjectsResponse); // Changed from subjectsResponse.data
-                setGrades(gradesResponse);     // Changed from gradesResponse.data
+                // Updated to use the new endpoint that only returns teacher's accessible subjects and grades
+                const response = await TestService.getTeacherSubjectsAndGrades();
+                setSubjects(response.subjects || []);
+                setGrades(response.grades || []);
             } catch (err) {
                 setError("Ошибка при загрузке данных: " + (err.message || 'Произошла ошибка'));
             } finally {
@@ -41,21 +39,30 @@ const TestForm = () => {
         fetchSubjectsAndGrades();
     }, []);
 
-    // Rest of the component remains the same...
-
     useEffect(() => {
         if (isEditing) {
             const fetchTest = async () => {
                 try {
                     setLoading(true);
                     const response = await TestService.getTestById(testId, true);
+                    const testData = response.data || response;
+
                     setFormData({
-                        title: response.data.title,
-                        description: response.data.description || '',
-                        subjectId: response.data.subject.id,
-                        timeLimit: response.data.timeLimit || 60,
-                        gradeIds: response.data.availableGrades.map(grade => grade.id),
-                        questions: response.data.questions || []
+                        title: testData.title,
+                        description: testData.description || '',
+                        subjectId: testData.subject?.id || testData.subjectId,
+                        timeLimit: testData.timeLimit || 60,
+                        gradeIds: (testData.availableGrades || []).map(grade => grade.id || grade),
+                        questions: (testData.questions || []).map(q => {
+                            // Ensure TEXT_ANSWER questions have at least one answer
+                            if (q.type === 'TEXT_ANSWER' && (!q.answers || q.answers.length === 0)) {
+                                return {
+                                    ...q,
+                                    answers: [{ text: '', isCorrect: true }]
+                                };
+                            }
+                            return q;
+                        })
                     });
                 } catch (err) {
                     setError("Ошибка при загрузке теста: " + (err.response?.data?.message || err.message));
@@ -102,6 +109,15 @@ const TestForm = () => {
             ...updatedQuestions[index],
             [field]: value
         };
+
+        // If changing type to TEXT_ANSWER, ensure we have correct answer structure
+        if (field === 'type' && value === 'TEXT_ANSWER') {
+            updatedQuestions[index].answers = [{
+                text: updatedQuestions[index].answers?.[0]?.text || '',
+                isCorrect: true
+            }];
+        }
+
         setFormData(prev => ({
             ...prev,
             questions: updatedQuestions
@@ -110,10 +126,22 @@ const TestForm = () => {
 
     const handleAnswerChange = (questionIndex, answerIndex, field, value) => {
         const updatedQuestions = [...formData.questions];
+
+        // Ensure answers array exists
+        if (!updatedQuestions[questionIndex].answers) {
+            updatedQuestions[questionIndex].answers = [];
+        }
+
+        // Ensure the specific answer exists
+        if (!updatedQuestions[questionIndex].answers[answerIndex]) {
+            updatedQuestions[questionIndex].answers[answerIndex] = { text: '', isCorrect: false };
+        }
+
         updatedQuestions[questionIndex].answers[answerIndex] = {
             ...updatedQuestions[questionIndex].answers[answerIndex],
             [field]: value
         };
+
         setFormData(prev => ({
             ...prev,
             questions: updatedQuestions
@@ -149,10 +177,17 @@ const TestForm = () => {
 
     const addAnswer = (questionIndex) => {
         const updatedQuestions = [...formData.questions];
+
+        // Ensure answers array exists
+        if (!updatedQuestions[questionIndex].answers) {
+            updatedQuestions[questionIndex].answers = [];
+        }
+
         updatedQuestions[questionIndex].answers.push({
             text: '',
             isCorrect: false
         });
+
         setFormData(prev => ({
             ...prev,
             questions: updatedQuestions
@@ -197,18 +232,31 @@ const TestForm = () => {
                     throw new Error(`Вопрос #${qIndex + 1} не содержит текста`);
                 }
 
-                if (question.answers.length < 2) {
-                    throw new Error(`Вопрос #${qIndex + 1} должен содержать хотя бы два варианта ответа`);
-                }
+                // Skip answer validation for text questions if at least one answer exists
+                if (question.type !== 'TEXT_ANSWER') {
+                    if (!question.answers || question.answers.length < 2) {
+                        throw new Error(`Вопрос #${qIndex + 1} должен содержать хотя бы два варианта ответа`);
+                    }
 
-                const hasCorrectAnswer = question.answers.some(answer => answer.isCorrect);
-                if (!hasCorrectAnswer) {
-                    throw new Error(`Вопрос #${qIndex + 1} должен иметь хотя бы один правильный ответ`);
-                }
+                    const hasCorrectAnswer = question.answers.some(answer => answer.isCorrect);
+                    if (!hasCorrectAnswer) {
+                        throw new Error(`Вопрос #${qIndex + 1} должен иметь хотя бы один правильный ответ`);
+                    }
 
-                for (const [aIndex, answer] of question.answers.entries()) {
-                    if (!answer.text.trim()) {
-                        throw new Error(`Ответ #${aIndex + 1} на вопрос #${qIndex + 1} не содержит текста`);
+                    for (const [aIndex, answer] of question.answers.entries()) {
+                        if (!answer.text.trim()) {
+                            throw new Error(`Ответ #${aIndex + 1} на вопрос #${qIndex + 1} не содержит текста`);
+                        }
+                    }
+                } else {
+                    // For TEXT_ANSWER, ensure we have at least one answer
+                    if (!question.answers || question.answers.length === 0) {
+                        throw new Error(`Вопрос #${qIndex + 1} должен иметь правильный ответ`);
+                    }
+
+                    // Ensure the answer has text
+                    if (!question.answers[0].text.trim()) {
+                        throw new Error(`Правильный ответ для вопроса #${qIndex + 1} не содержит текста`);
                     }
                 }
             }
@@ -279,6 +327,7 @@ const TestForm = () => {
                             value={formData.title}
                             onChange={handleChange}
                             required
+                            className="form-control"
                         />
                     </div>
 
@@ -290,6 +339,7 @@ const TestForm = () => {
                             value={formData.subjectId}
                             onChange={handleChange}
                             required
+                            className="form-control"
                         >
                             <option value="">Выберите предмет</option>
                             {subjects.map(subject => (
@@ -308,6 +358,7 @@ const TestForm = () => {
                             value={formData.description}
                             onChange={handleChange}
                             rows="3"
+                            className="form-control"
                         />
                     </div>
 
@@ -320,25 +371,30 @@ const TestForm = () => {
                             min="1"
                             value={formData.timeLimit}
                             onChange={handleChange}
+                            className="form-control"
                         />
                     </div>
 
                     <div className="form-group">
                         <label>Доступно для классов *</label>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '8px' }}>
-                            {grades.map(grade => (
-                                <div key={grade.id} style={{ minWidth: '100px' }}>
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            value={grade.id}
-                                            checked={formData.gradeIds.includes(grade.id)}
-                                            onChange={handleGradeChange}
-                                        />
-                                        {grade.name}
-                                    </label>
-                                </div>
-                            ))}
+                            {grades.length > 0 ? (
+                                grades.map(grade => (
+                                    <div key={grade.id} style={{ minWidth: '100px' }}>
+                                        <label>
+                                            <input
+                                                type="checkbox"
+                                                value={grade.id}
+                                                checked={formData.gradeIds.includes(grade.id)}
+                                                onChange={handleGradeChange}
+                                            />
+                                            {' ' + grade.fullName}
+                                        </label>
+                                    </div>
+                                ))
+                            ) : (
+                                <p>У вас нет доступных классов. Обратитесь к администратору.</p>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -383,6 +439,7 @@ const TestForm = () => {
                                     onChange={(e) => handleQuestionChange(qIndex, 'text', e.target.value)}
                                     rows="2"
                                     required
+                                    className="form-control"
                                 />
                             </div>
 
@@ -392,6 +449,7 @@ const TestForm = () => {
                                     id={`question-type-${qIndex}`}
                                     value={question.type}
                                     onChange={(e) => handleQuestionChange(qIndex, 'type', e.target.value)}
+                                    className="form-control"
                                 >
                                     <option value="SINGLE_CHOICE">Один вариант ответа</option>
                                     <option value="MULTIPLE_CHOICE">Несколько вариантов ответа</option>
@@ -407,6 +465,7 @@ const TestForm = () => {
                                     min="1"
                                     value={question.points || 1}
                                     onChange={(e) => handleQuestionChange(qIndex, 'points', e.target.value)}
+                                    className="form-control"
                                 />
                             </div>
 
@@ -414,7 +473,7 @@ const TestForm = () => {
                                 <div style={{ marginTop: '1rem' }}>
                                     <h5>Варианты ответов</h5>
 
-                                    {question.answers.map((answer, aIndex) => (
+                                    {question.answers && question.answers.map((answer, aIndex) => (
                                         <div
                                             key={aIndex}
                                             style={{
@@ -434,6 +493,7 @@ const TestForm = () => {
                                                     placeholder="Текст ответа"
                                                     required
                                                     style={{ width: '100%' }}
+                                                    className="form-control"
                                                 />
                                             </div>
 
@@ -520,6 +580,7 @@ const TestForm = () => {
                                         }}
                                         placeholder="Введите правильный ответ"
                                         style={{ width: '100%' }}
+                                        className="form-control"
                                     />
                                     <p style={{ marginTop: '0.5rem', color: '#666', fontSize: '0.9rem' }}>
                                         Ответ студента будет проверяться на точное соответствие (без учета регистра)

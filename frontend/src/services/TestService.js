@@ -97,6 +97,10 @@ class TestService {
     permanentlyDeleteTest(testId) {
         return api.delete(`/tests/${testId}/permanent`);
     }
+
+    getTeacherSubjectsAndGrades() {
+        return api.get('/teacher/subjects-and-grades');
+    }
 }
 
 export default new TestService();

@@ -90,7 +90,13 @@ public class AuthService {
         }
     }
 
-
+    public User getCurrentUser(String token) {
+        Optional<User> userOpt = findByToken(token.replace("Bearer ", ""));
+        if (userOpt.isEmpty()) {
+            throw new RuntimeException("Требуется авторизация");
+        }
+        return userOpt.get();
+    }
 
     public String encodePassword(String rawPassword) {
         return passwordEncoder.encode(rawPassword);

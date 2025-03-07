@@ -37,20 +37,13 @@ public class TestController {
                 .body(body);
     }
 
-    private User getCurrentUser(String token) {
-        Optional<User> userOpt = authService.findByToken(token.replace("Bearer ", ""));
-        if (userOpt.isEmpty()) {
-            throw new RuntimeException("Требуется авторизация");
-        }
-        return userOpt.get();
-    }
 
     // Create a new test
     @PostMapping
     public ResponseEntity<TestDto> createTest(
             @RequestBody TestCreateRequest request,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
         if (currentUser.getRole() != UserRole.TEACHER && currentUser.getRole() != UserRole.ADMIN) {
             throw new RuntimeException("У вас нет прав на создание тестов");
         }
@@ -62,7 +55,7 @@ public class TestController {
     // Get all tests (for admins)
     @GetMapping
     public ResponseEntity<List<TestDto>> getAllTests(@RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         List<TestDto> tests;
 
@@ -82,7 +75,7 @@ public class TestController {
     public ResponseEntity<TestResultDetailsDto> getTestResultDetails(
             @PathVariable Long resultId,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         // Получаем детали результата теста, включая ответы студента
         TestResultDetailsDto resultDetails = testService.getTestResultDetails(resultId, currentUser.getId());
@@ -92,7 +85,7 @@ public class TestController {
     public ResponseEntity<?> permanentlyDeleteTest(
             @PathVariable Long testId,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         testService.permanentlyDeleteTest(testId, currentUser.getId());
         return ResponseEntity.ok().build();
@@ -102,7 +95,7 @@ public class TestController {
             @PathVariable Long testId,
             @RequestParam(required = false, defaultValue = "false") boolean clearAttempts,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         if (currentUser.getRole() != UserRole.TEACHER && currentUser.getRole() != UserRole.ADMIN) {
             throw new RuntimeException("У вас нет прав на активацию тестов");
@@ -117,7 +110,7 @@ public class TestController {
             @PathVariable Long testId,
             @RequestParam(required = false, defaultValue = "false") boolean includeAnswers,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         TestDto test = testService.getTestWithQuestions(testId, currentUser.getId(), includeAnswers);
         return ResponseEntity.ok(test);
@@ -129,7 +122,7 @@ public class TestController {
             @PathVariable Long testId,
             @RequestBody TestCreateRequest request,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         if (currentUser.getRole() != UserRole.TEACHER && currentUser.getRole() != UserRole.ADMIN) {
             throw new RuntimeException("У вас нет прав на редактирование тестов");
@@ -144,7 +137,7 @@ public class TestController {
     public ResponseEntity<Void> deleteTest(
             @PathVariable Long testId,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         if (currentUser.getRole() != UserRole.TEACHER && currentUser.getRole() != UserRole.ADMIN) {
             throw new RuntimeException("У вас нет прав на удаление тестов");
@@ -160,7 +153,7 @@ public class TestController {
             @PathVariable Long testId,
             @RequestParam Long testResultId,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         if (currentUser.getRole() != UserRole.STUDENT) {
             throw new RuntimeException("Только ученики могут получать вопросы для прохождения теста");
@@ -174,7 +167,7 @@ public class TestController {
     public ResponseEntity<TestResultDto> getInProgressTest(
             @PathVariable Long testId,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         if (currentUser.getRole() != UserRole.STUDENT) {
             throw new RuntimeException("Только ученики могут получить информацию о незавершенном тесте");
@@ -189,7 +182,7 @@ public class TestController {
     public ResponseEntity<TestResultDto> startTest(
             @PathVariable Long testId,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         if (currentUser.getRole() != UserRole.STUDENT) {
             throw new RuntimeException("Только ученики могут начинать тесты");
@@ -204,7 +197,7 @@ public class TestController {
     public ResponseEntity<TestResultDto> submitTest(
             @RequestBody TestSubmissionRequest request,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         if (currentUser.getRole() != UserRole.STUDENT) {
             throw new RuntimeException("Только ученики могут отправлять ответы на тест");
@@ -218,7 +211,7 @@ public class TestController {
     @GetMapping("/results")
     public ResponseEntity<List<TestResultDto>> getStudentResults(
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         if (currentUser.getRole() != UserRole.STUDENT) {
             throw new RuntimeException("Это API предназначено только для учеников");
@@ -232,7 +225,7 @@ public class TestController {
     public ResponseEntity<TestResultDto> getTestResultById(
             @PathVariable Long resultId,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         TestResultDto result = testService.getTestResultById(resultId, currentUser.getId());
         return ResponseEntity.ok(result);
@@ -242,7 +235,7 @@ public class TestController {
     public ResponseEntity<List<TestResultDto>> getTestResults(
             @PathVariable Long testId,
             @RequestHeader("Authorization") String token) {
-        User currentUser = getCurrentUser(token);
+        User currentUser = authService.getCurrentUser(token);
 
         if (currentUser.getRole() != UserRole.TEACHER && currentUser.getRole() != UserRole.ADMIN) {
             throw new RuntimeException("У вас нет прав на просмотр результатов теста");
