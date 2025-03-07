@@ -73,12 +73,34 @@ const TestTaking = () => {
                 const questionsResponse = await TestService.getTestQuestions(testId, resultData.id);
                 // Проверяем, возвращается ли ответ в поле data или напрямую
                 const questionsData = questionsResponse.data || questionsResponse;
-                setQuestions(questionsData);
+
+                // Удаляем информацию о правильных ответах, если она присутствует
+                const cleanQuestions = questionsData.map(question => {
+                    const cleanQuestion = {...question};
+
+                    // Удаляем информацию о правильности из ответов
+                    if (cleanQuestion.answers) {
+                        cleanQuestion.answers = cleanQuestion.answers.map(answer => {
+                            const { isCorrect, ...cleanAnswer } = answer;
+                            return cleanAnswer;
+                        });
+                    }
+
+                    return cleanQuestion;
+                });
+
+                setQuestions(cleanQuestions);
 
                 // Инициализируем объект с ответами пользователя
                 const initialAnswers = {};
-                questionsData.forEach(question => {
-                    initialAnswers[question.id] = question.type === 'MULTIPLE_CHOICE' ? [] : null;
+                cleanQuestions.forEach(question => {
+                    if (question.type === 'MULTIPLE_CHOICE') {
+                        initialAnswers[question.id] = [];
+                    } else if (question.type === 'TEXT_ANSWER') {
+                        initialAnswers[question.id] = '';
+                    } else {
+                        initialAnswers[question.id] = null;
+                    }
                 });
                 setAnswers(initialAnswers);
             } catch (err) {
@@ -113,17 +135,23 @@ const TestTaking = () => {
     }, [timeLeft]);
 
     // Обработчик ответа на вопрос
-    const handleAnswerChange = (questionId, answerId, isMultiple = false) => {
+    const handleAnswerChange = (questionId, value, isMultiple = false, isText = false) => {
         if (timeExpired) return; // Не позволяем менять ответы после истечения времени
 
-        if (isMultiple) {
+        if (isText) {
+            // Для текстовых ответов
+            setAnswers(prev => ({
+                ...prev,
+                [questionId]: value
+            }));
+        } else if (isMultiple) {
             // Множественный выбор - добавляем/удаляем ID ответа из массива
             setAnswers(prev => {
                 const currentAnswers = [...(prev[questionId] || [])];
-                const index = currentAnswers.indexOf(answerId);
+                const index = currentAnswers.indexOf(value);
 
                 if (index === -1) {
-                    currentAnswers.push(answerId);
+                    currentAnswers.push(value);
                 } else {
                     currentAnswers.splice(index, 1);
                 }
@@ -137,7 +165,7 @@ const TestTaking = () => {
             // Единственный выбор - просто сохраняем ID ответа
             setAnswers(prev => ({
                 ...prev,
-                [questionId]: answerId
+                [questionId]: value
             }));
         }
     };
@@ -167,7 +195,11 @@ const TestTaking = () => {
             const unansweredQuestions = [];
             questions.forEach((question, index) => {
                 const answer = answers[question.id];
-                if (answer === null || (Array.isArray(answer) && answer.length === 0)) {
+                if (
+                    answer === null ||
+                    (Array.isArray(answer) && answer.length === 0) ||
+                    (question.type === 'TEXT_ANSWER' && answer.trim() === '')
+                ) {
                     unansweredQuestions.push(index + 1);
                 }
             });
@@ -183,10 +215,22 @@ const TestTaking = () => {
             // Формируем данные для отправки
             const submissionData = {
                 testResultId: testResult.id,
-                answers: Object.entries(answers).map(([questionId, answer]) => ({
-                    questionId: parseInt(questionId),
-                    selectedAnswerIds: Array.isArray(answer) ? answer : answer !== null ? [answer] : []
-                }))
+                answers: Object.entries(answers).map(([questionId, answer]) => {
+                    const question = questions.find(q => q.id === parseInt(questionId));
+
+                    if (question.type === 'TEXT_ANSWER') {
+                        return {
+                            questionId: parseInt(questionId),
+                            textAnswer: answer,
+                            selectedAnswerIds: []
+                        };
+                    } else {
+                        return {
+                            questionId: parseInt(questionId),
+                            selectedAnswerIds: Array.isArray(answer) ? answer : answer !== null ? [answer] : []
+                        };
+                    }
+                })
             };
 
             // Отправляем ответы
@@ -209,6 +253,22 @@ const TestTaking = () => {
                 setError("Ошибка при отправке ответов: " + (err.response?.data?.message || err.message));
                 setSubmitting(false);
             }
+        }
+    };
+
+    // Проверка, отвечен ли вопрос
+    const isQuestionAnswered = (questionId) => {
+        const answer = answers[questionId];
+        const question = questions.find(q => q.id === questionId);
+
+        if (!question) return false;
+
+        if (question.type === 'TEXT_ANSWER') {
+            return answer && answer.trim() !== '';
+        } else if (question.type === 'MULTIPLE_CHOICE') {
+            return Array.isArray(answer) && answer.length > 0;
+        } else {
+            return answer !== null;
         }
     };
 
@@ -242,6 +302,66 @@ const TestTaking = () => {
             Время выполнения теста истекло! Ваши ответы будут отправлены автоматически.
         </div>
     ) : null;
+
+    // Рендер содержимого вопроса в зависимости от типа
+    const renderQuestionContent = () => {
+        if (currentQuestion.type === 'TEXT_ANSWER') {
+            return (
+                <div style={{ marginTop: '1.5rem' }}>
+                    <textarea
+                        value={answers[currentQuestion.id] || ''}
+                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value, false, true)}
+                        disabled={timeExpired}
+                        placeholder="Введите ваш ответ здесь..."
+                        style={{
+                            width: '100%',
+                            minHeight: '150px',
+                            padding: '0.75rem',
+                            borderRadius: '4px',
+                            border: '1px solid #ddd',
+                            opacity: timeExpired ? 0.7 : 1
+                        }}
+                    />
+                </div>
+            );
+        } else {
+            return (
+                <div style={{ marginTop: '1.5rem' }}>
+                    {currentQuestion.answers.map(answer => (
+                        <div key={answer.id} style={{ marginBottom: '0.75rem' }}>
+                            <label style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '0.75rem',
+                                backgroundColor: '#f9f9f9',
+                                borderRadius: '4px',
+                                cursor: timeExpired ? 'not-allowed' : 'pointer',
+                                opacity: timeExpired ? 0.7 : 1
+                            }}>
+                                <input
+                                    type={currentQuestion.type === 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}
+                                    name={`question-${currentQuestion.id}`}
+                                    checked={
+                                        currentQuestion.type === 'MULTIPLE_CHOICE'
+                                            ? (answers[currentQuestion.id] || []).includes(answer.id)
+                                            : answers[currentQuestion.id] === answer.id
+                                    }
+                                    onChange={() => handleAnswerChange(
+                                        currentQuestion.id,
+                                        answer.id,
+                                        currentQuestion.type === 'MULTIPLE_CHOICE'
+                                    )}
+                                    disabled={timeExpired}
+                                    style={{ marginRight: '1rem' }}
+                                />
+                                {answer.text}
+                            </label>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+    };
 
     return (
         <div>
@@ -285,40 +405,7 @@ const TestTaking = () => {
                 marginBottom: '1.5rem'
             }}>
                 <h3>{currentQuestion.text}</h3>
-
-                <div style={{ marginTop: '1.5rem' }}>
-                    {currentQuestion.answers.map(answer => (
-                        <div key={answer.id} style={{ marginBottom: '0.75rem' }}>
-                            <label style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                padding: '0.75rem',
-                                backgroundColor: '#f9f9f9',
-                                borderRadius: '4px',
-                                cursor: timeExpired ? 'not-allowed' : 'pointer',
-                                opacity: timeExpired ? 0.7 : 1
-                            }}>
-                                <input
-                                    type={currentQuestion.type === 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}
-                                    name={`question-${currentQuestion.id}`}
-                                    checked={
-                                        currentQuestion.type === 'MULTIPLE_CHOICE'
-                                            ? (answers[currentQuestion.id] || []).includes(answer.id)
-                                            : answers[currentQuestion.id] === answer.id
-                                    }
-                                    onChange={() => handleAnswerChange(
-                                        currentQuestion.id,
-                                        answer.id,
-                                        currentQuestion.type === 'MULTIPLE_CHOICE'
-                                    )}
-                                    disabled={timeExpired}
-                                    style={{ marginRight: '1rem' }}
-                                />
-                                {answer.text}
-                            </label>
-                        </div>
-                    ))}
-                </div>
+                {renderQuestionContent()}
             </div>
 
             <div style={{
@@ -397,10 +484,9 @@ const TestTaking = () => {
                             backgroundColor:
                                 currentQuestionIndex === index
                                     ? '#2196F3'
-                                    : (answers[question.id] === null ||
-                                        (Array.isArray(answers[question.id]) && answers[question.id].length === 0))
-                                        ? '#F44336'
-                                        : '#4CAF50',
+                                    : isQuestionAnswered(question.id)
+                                        ? '#4CAF50'
+                                        : '#F44336',
                             color: 'white',
                             borderRadius: '50%',
                             border: 'none',
