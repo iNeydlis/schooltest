@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import TestService from '../services/TestService';
+import {AuthContext} from "../context/AuthContext.jsx";
 
 const TestForm = () => {
     const { testId } = useParams();
@@ -20,15 +21,34 @@ const TestForm = () => {
     const [grades, setGrades] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const { user } = useContext(AuthContext);
+    const isAdmin = user && user.role === 'ADMIN';
 
     useEffect(() => {
         const fetchSubjectsAndGrades = async () => {
             try {
                 setLoading(true);
-                // Updated to use the new endpoint that only returns teacher's accessible subjects and grades
-                const response = await TestService.getTeacherSubjectsAndGrades();
-                setSubjects(response.subjects || []);
-                setGrades(response.grades || []);
+
+                // Load subjects and classes depending on user role
+                if (isAdmin) {
+                    // For administrator, load all subjects and classes
+                    const subjectsResponse = await TestService.getAllSubjects();
+                    const gradesResponse = await TestService.getAllGrades();
+
+                    console.log('Admin subjects response:', subjectsResponse);
+                    console.log('Admin grades response:', gradesResponse);
+
+                    setSubjects(subjectsResponse.subjects || []);
+                    setGrades(gradesResponse.grades || []);
+                } else {
+                    // For regular teachers, use the existing endpoint
+                    const response = await TestService.getTeacherSubjectsAndGrades();
+
+                    console.log('Teacher subjects and grades response:', response);
+
+                    setSubjects(response.subjects || []);
+                    setGrades(response.grades || []);
+                }
             } catch (err) {
                 setError("Ошибка при загрузке данных: " + (err.message || 'Произошла ошибка'));
             } finally {
@@ -37,7 +57,7 @@ const TestForm = () => {
         };
 
         fetchSubjectsAndGrades();
-    }, []);
+    }, [isAdmin]);
 
     useEffect(() => {
         if (isEditing) {
