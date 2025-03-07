@@ -35,11 +35,8 @@ const TestForm = () => {
                     const subjectsResponse = await TestService.getAllSubjects();
                     const gradesResponse = await TestService.getAllGrades();
 
-                    console.log('Admin subjects response:', subjectsResponse);
-                    console.log('Admin grades response:', gradesResponse);
-
-                    setSubjects(subjectsResponse.subjects || []);
-                    setGrades(gradesResponse.grades || []);
+                    setSubjects(Array.isArray(subjectsResponse) ? subjectsResponse : subjectsResponse.subjects || []);
+                    setGrades(Array.isArray(gradesResponse) ? gradesResponse : gradesResponse.grades || []);
                 } else {
                     // For regular teachers, use the existing endpoint
                     const response = await TestService.getTeacherSubjectsAndGrades();
