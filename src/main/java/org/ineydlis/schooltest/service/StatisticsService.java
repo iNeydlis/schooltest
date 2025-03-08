@@ -1,8 +1,10 @@
 package org.ineydlis.schooltest.service;
 
 import lombok.RequiredArgsConstructor;
-import org.ineydlis.schooltest.dto.StatisticsDto;
+import org.ineydlis.schooltest.dto.StatisticViewDto;
 import org.ineydlis.schooltest.dto.TestResultDetailsDto;
+import org.ineydlis.schooltest.dto.UserStatDto;
+import org.ineydlis.schooltest.dto.SubjectStatDto;
 import org.ineydlis.schooltest.model.*;
 import org.ineydlis.schooltest.repository.*;
 import org.springframework.stereotype.Service;
@@ -21,22 +23,136 @@ public class StatisticsService {
     private final TestRepository testRepository;
     private final AuthService authService;
 
-    public boolean canAccessTestStatistics(String token, Long testResultId) {
-        // Implementation remains the same, likely checks user role and permissions
-        return true; // Placeholder
+    /**
+     * Check if user has access to view statistics
+     */
+    public boolean canAccessStatistics(String token, Long entityId, StatisticsAccessType accessType) {
+        User currentUser = authService.getCurrentUser(token.replace("Bearer ", ""));
+
+        switch (accessType) {
+            case TEST_RESULT:
+                return canAccessTestStatistics(currentUser, entityId);
+            case STUDENT:
+                return canAccessStudentStatistics(currentUser, entityId);
+            case GRADE:
+                return canAccessGradeStatistics(currentUser, entityId);
+            case SUBJECT:
+                return canAccessSubjectStatistics(currentUser, entityId);
+            default:
+                return false;
+        }
     }
 
-    public TestResultDetailsDto getTestStatistics(String token, Long testResultId) {
-        // Получаем результат теста
-        TestResult testResult = testResultRepository.findById(testResultId)
-                .orElseThrow(() -> new RuntimeException("Результат теста не найден"));
+    private boolean canAccessTestStatistics(User currentUser, Long testResultId) {
+        // Admin can access any test result
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            return true;
+        }
 
-        // Получаем информацию о тесте, ученике и классе
+        TestResult testResult = testResultRepository.findById(testResultId)
+                .orElseThrow(() -> new RuntimeException("Test result not found"));
+
+        // Students can only access their own test results
+        if (currentUser.getRole() == UserRole.STUDENT) {
+            return currentUser.getId().equals(testResult.getStudent().getId());
+        }
+
+        // Teachers can access test results for their subjects
+        if (currentUser.getRole() == UserRole.TEACHER) {
+            return currentUser.getSubjects().contains(testResult.getTest().getSubject());
+        }
+
+        return false;
+    }
+
+    private boolean canAccessStudentStatistics(User currentUser, Long studentId) {
+        // Admin can access any student's statistics
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            return true;
+        }
+
+        // Students can only access their own statistics
+        if (currentUser.getRole() == UserRole.STUDENT) {
+            return currentUser.getId().equals(studentId);
+        }
+
+        // Teachers can access statistics for students in their classes/subjects
+        if (currentUser.getRole() == UserRole.TEACHER) {
+            User student = userRepository.findById(studentId)
+                    .orElseThrow(() -> new RuntimeException("Student not found"));
+
+            // Check if student's grade is assigned to teacher's subjects
+            Set<Subject> teacherSubjects = currentUser.getSubjects();
+            return teacherSubjects.stream()
+                    .anyMatch(subject -> {
+                        List<TestResult> results = testResultRepository.findByStudentIdAndTestSubjectId(studentId, subject.getId());
+                        return !results.isEmpty();
+                    });
+        }
+
+        return false;
+    }
+
+    private boolean canAccessGradeStatistics(User currentUser, Long gradeId) {
+        // Admin can access any grade statistics
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            return true;
+        }
+
+        // Students can access their own grade statistics
+        if (currentUser.getRole() == UserRole.STUDENT) {
+            return currentUser.getGrade() != null && currentUser.getGrade().getId().equals(gradeId);
+        }
+
+        // Teachers can access statistics for grades they teach
+        if (currentUser.getRole() == UserRole.TEACHER) {
+            // Check if teacher teaches any subject for this grade
+            return testRepository.findBySubjectInAndGradeId(
+                    currentUser.getSubjects(), gradeId).size() > 0;
+        }
+
+        return false;
+    }
+
+    private boolean canAccessSubjectStatistics(User currentUser, Long subjectId) {
+        // Admin can access any subject statistics
+        if (currentUser.getRole() == UserRole.ADMIN) {
+            return true;
+        }
+
+        // Students can access subject statistics for subjects they take
+        if (currentUser.getRole() == UserRole.STUDENT) {
+            List<TestResult> results = testResultRepository.findByStudentIdAndTestSubjectId(
+                    currentUser.getId(), subjectId);
+            return !results.isEmpty();
+        }
+
+        // Teachers can access statistics for subjects they teach
+        if (currentUser.getRole() == UserRole.TEACHER) {
+            return currentUser.getSubjects().stream()
+                    .anyMatch(subject -> subject.getId().equals(subjectId));
+        }
+
+        return false;
+    }
+
+    /**
+     * Get detailed statistics for a specific test result
+     */
+    public TestResultDetailsDto getTestResultDetails(String token, Long testResultId) {
+        User currentUser = authService.getCurrentUser(token.replace("Bearer ", ""));
+
+        if (!canAccessStatistics(token, testResultId, StatisticsAccessType.TEST_RESULT)) {
+            throw new RuntimeException("You don't have permission to view this test result");
+        }
+
+        TestResult testResult = testResultRepository.findById(testResultId)
+                .orElseThrow(() -> new RuntimeException("Test result not found"));
+
         Test test = testResult.getTest();
         User student = testResult.getStudent();
         Grade grade = student.getGrade();
 
-        // Создаем DTO с нужной информацией
         TestResultDetailsDto detailsDto = new TestResultDetailsDto();
         detailsDto.setTestId(test.getId());
         detailsDto.setTestTitle(test.getTitle());
@@ -52,143 +168,435 @@ public class StatisticsService {
         return detailsDto;
     }
 
-    public StatisticsDto getStudentSubjectStatistics(String token, Long studentId, Long subjectId) {
-        // Находим все результаты тестов для данного студента по данному предмету
-        List<TestResult> testResults = testResultRepository.findByStudentIdAndTestSubjectId(studentId, subjectId);
+    /**
+     * Get statistics for a specific test (all students' best attempts)
+     */
+    public StatisticViewDto getTestStatistics(String token, Long testId) {
+        User currentUser = authService.getCurrentUser(token.replace("Bearer ", ""));
+        Test test = testRepository.findById(testId)
+                .orElseThrow(() -> new RuntimeException("Test not found"));
 
-        // Оставляем только лучшие попытки
-        List<TestResult> bestAttempts = findBestAttempts(testResults, studentId, subjectId);
+        if (!canAccessSubjectStatistics(currentUser, test.getSubject().getId())) {
+            throw new RuntimeException("You don't have permission to view this test's statistics");
+        }
 
-        // Считаем статистику по лучшим попыткам
-        return calculateStatistics(bestAttempts);
+        List<TestResult> allResults = testResultRepository.findByTestId(testId);
+
+        // Group results by student and find best attempt for each
+        Map<Long, List<TestResult>> resultsByStudent = allResults.stream()
+                .collect(Collectors.groupingBy(r -> r.getStudent().getId()));
+
+        List<UserStatDto> studentStats = new ArrayList<>();
+
+        resultsByStudent.forEach((studentId, results) -> {
+            TestResult bestAttempt = results.stream()
+                    .max(Comparator.comparingInt(TestResult::getScore))
+                    .orElse(null);
+
+            if (bestAttempt != null) {
+                User student = bestAttempt.getStudent();
+                UserStatDto statDto = new UserStatDto();
+                statDto.setUserId(student.getId());
+                statDto.setUserName(student.getFullName());
+                statDto.setGradeId(student.getGrade().getId());
+                statDto.setGradeName(student.getGrade().getFullName());
+                statDto.setScore(bestAttempt.getScore());
+                statDto.setMaxScore(bestAttempt.getMaxScore());
+                statDto.setCompletedAt(bestAttempt.getCompletedAt());
+                statDto.setAttemptNumber(bestAttempt.getAttemptNumber());
+
+                studentStats.add(statDto);
+            }
+        });
+
+        // Sort by score (descending)
+        studentStats.sort(Comparator.comparingInt(UserStatDto::getScore).reversed());
+
+        StatisticViewDto viewDto = new StatisticViewDto();
+        viewDto.setTestId(test.getId());
+        viewDto.setTestTitle(test.getTitle());
+        viewDto.setSubjectId(test.getSubject().getId());
+        viewDto.setSubjectName(test.getSubject().getName());
+        viewDto.setUserStats(studentStats);
+        viewDto.setTotalStudents(studentStats.size());
+        viewDto.setAverageScore(calculateAverageScore(studentStats));
+
+        return viewDto;
     }
 
-    public StatisticsDto getGradeStatistics(String token, Long gradeId) {
-        // Находим все результаты тестов для данного класса
-        List<TestResult> testResults = testResultRepository.findByStudentGradeId(gradeId);
+    /**
+     * Get statistics for a specific grade (all students' best test attempts)
+     */
+    public StatisticViewDto getGradeStatistics(String token, Long gradeId) {
+        User currentUser = authService.getCurrentUser(token.replace("Bearer ", ""));
 
-        // Оставляем только лучшие попытки для каждого ученика в классе
-        List<TestResult> bestAttempts = findBestAttemptsForGrade(testResults, gradeId);
+        if (!canAccessStatistics(token, gradeId, StatisticsAccessType.GRADE)) {
+            throw new RuntimeException("You don't have permission to view this grade's statistics");
+        }
 
-        // Считаем статистику по лучшим попыткам
-        return calculateStatistics(bestAttempts);
+        Grade grade = gradeRepository.findById(gradeId)
+                .orElseThrow(() -> new RuntimeException("Grade not found"));
+
+        List<User> students = userRepository.findByGradeId(gradeId);
+        List<UserStatDto> studentStats = new ArrayList<>();
+
+        for (User student : students) {
+            List<TestResult> allResults = testResultRepository.findByStudentId(student.getId());
+
+            // Group results by test and find best attempt for each
+            Map<Long, List<TestResult>> resultsByTest = allResults.stream()
+                    .collect(Collectors.groupingBy(r -> r.getTest().getId()));
+
+            int totalScore = 0;
+            int totalMaxScore = 0;
+            int completedTests = 0;
+
+            for (List<TestResult> testResults : resultsByTest.values()) {
+                TestResult bestAttempt = testResults.stream()
+                        .max(Comparator.comparingInt(TestResult::getScore))
+                        .orElse(null);
+
+                if (bestAttempt != null) {
+                    totalScore += bestAttempt.getScore();
+                    totalMaxScore += bestAttempt.getMaxScore();
+                    completedTests++;
+                }
+            }
+
+            if (completedTests > 0) {
+                UserStatDto statDto = new UserStatDto();
+                statDto.setUserId(student.getId());
+                statDto.setUserName(student.getFullName());
+                statDto.setGradeId(grade.getId());
+                statDto.setGradeName(grade.getFullName());
+                statDto.setScore(totalScore);
+                statDto.setMaxScore(totalMaxScore);
+                statDto.setCompletedTests(completedTests);
+                statDto.setAveragePercentage(totalMaxScore > 0 ?
+                        (double) totalScore / totalMaxScore * 100 : 0);
+
+                studentStats.add(statDto);
+            }
+        }
+
+        // Sort by average percentage (descending)
+        studentStats.sort(Comparator.comparingDouble(UserStatDto::getAveragePercentage).reversed());
+
+        StatisticViewDto viewDto = new StatisticViewDto();
+        viewDto.setGradeId(grade.getId());
+        viewDto.setGradeName(grade.getFullName());
+        viewDto.setUserStats(studentStats);
+        viewDto.setTotalStudents(studentStats.size());
+        viewDto.setAverageScore(calculateAverageScore(studentStats));
+
+        return viewDto;
     }
 
-    public StatisticsDto getStudentTestAttemptsStatistics(String token, Long studentId, Long testId) {
-        // Находим все результаты тестов для данного студента по данному тесту
-        List<TestResult> testResults = testResultRepository.findByStudentIdAndTestId(studentId, testId);
+    /**
+     * Get statistics for a specific subject (all students' best test attempts)
+     */
+    public StatisticViewDto getSubjectStatistics(String token, Long subjectId) {
+        User currentUser = authService.getCurrentUser(token.replace("Bearer ", ""));
 
-        // Оставляем только лучшую попытку
-        List<TestResult> bestAttempts = findBestAttemptForStudentTest(testResults, studentId, testId);
+        if (!canAccessStatistics(token, subjectId, StatisticsAccessType.SUBJECT)) {
+            throw new RuntimeException("You don't have permission to view this subject's statistics");
+        }
 
-        // Считаем статистику по лучшей попытке
-        return calculateStatistics(bestAttempts);
+        Subject subject = subjectRepository.findById(subjectId)
+                .orElseThrow(() -> new RuntimeException("Subject not found"));
+
+        List<Test> tests = testRepository.findBySubjectId(subjectId);
+        Map<Long, List<TestResult>> resultsByStudentId = new HashMap<>();
+
+        for (Test test : tests) {
+            List<TestResult> testResults = testResultRepository.findByTestId(test.getId());
+
+            for (TestResult result : testResults) {
+                Long studentId = result.getStudent().getId();
+                resultsByStudentId.computeIfAbsent(studentId, k -> new ArrayList<>())
+                        .add(result);
+            }
+        }
+
+        List<UserStatDto> studentStats = new ArrayList<>();
+
+        resultsByStudentId.forEach((studentId, results) -> {
+            // Group results by test
+            Map<Long, List<TestResult>> resultsByTest = results.stream()
+                    .collect(Collectors.groupingBy(r -> r.getTest().getId()));
+
+            int totalScore = 0;
+            int totalMaxScore = 0;
+            int completedTests = 0;
+
+            for (List<TestResult> testResults : resultsByTest.values()) {
+                TestResult bestAttempt = testResults.stream()
+                        .max(Comparator.comparingInt(TestResult::getScore))
+                        .orElse(null);
+
+                if (bestAttempt != null) {
+                    totalScore += bestAttempt.getScore();
+                    totalMaxScore += bestAttempt.getMaxScore();
+                    completedTests++;
+                }
+            }
+
+            if (completedTests > 0) {
+                User student = userRepository.findById(studentId)
+                        .orElseThrow(() -> new RuntimeException("Student not found"));
+
+                UserStatDto statDto = new UserStatDto();
+                statDto.setUserId(student.getId());
+                statDto.setUserName(student.getFullName());
+                statDto.setGradeId(student.getGrade().getId());
+                statDto.setGradeName(student.getGrade().getFullName());
+                statDto.setScore(totalScore);
+                statDto.setMaxScore(totalMaxScore);
+                statDto.setCompletedTests(completedTests);
+                statDto.setAveragePercentage(totalMaxScore > 0 ?
+                        (double) totalScore / totalMaxScore * 100 : 0);
+
+                studentStats.add(statDto);
+            }
+        });
+
+        // Sort by average percentage (descending)
+        studentStats.sort(Comparator.comparingDouble(UserStatDto::getAveragePercentage).reversed());
+
+        StatisticViewDto viewDto = new StatisticViewDto();
+        viewDto.setSubjectId(subject.getId());
+        viewDto.setSubjectName(subject.getName());
+        viewDto.setUserStats(studentStats);
+        viewDto.setTotalStudents(studentStats.size());
+        viewDto.setAverageScore(calculateAverageScore(studentStats));
+
+        return viewDto;
     }
 
-    public Map<String, StatisticsDto> getStudentOverallPerformance(String token, Long studentId) {
-        // Получаем ученика
+    /**
+     * Get student's statistics for a specific subject
+     */
+    public StatisticViewDto getStudentSubjectStatistics(String token, Long studentId, Long subjectId) {
+        User currentUser = authService.getCurrentUser(token.replace("Bearer ", ""));
+
+        if (!canAccessStatistics(token, studentId, StatisticsAccessType.STUDENT)) {
+            throw new RuntimeException("You don't have permission to view this student's statistics");
+        }
+
         User student = userRepository.findById(studentId)
-                .orElseThrow(() -> new RuntimeException("Ученик не найден"));
+                .orElseThrow(() -> new RuntimeException("Student not found"));
 
-        // Получаем все предметы
+        Subject subject = subjectRepository.findById(subjectId)
+                .orElseThrow(() -> new RuntimeException("Subject not found"));
+
+        List<Test> tests = testRepository.findBySubjectId(subjectId);
+        List<SubjectStatDto> testStats = new ArrayList<>();
+
+        for (Test test : tests) {
+            List<TestResult> results = testResultRepository.findByStudentIdAndTestId(studentId, test.getId());
+
+            if (!results.isEmpty()) {
+                TestResult bestAttempt = results.stream()
+                        .max(Comparator.comparingInt(TestResult::getScore))
+                        .orElse(null);
+
+                if (bestAttempt != null) {
+                    SubjectStatDto statDto = new SubjectStatDto();
+                    statDto.setTestId(test.getId());
+                    statDto.setTestTitle(test.getTitle());
+                    statDto.setScore(bestAttempt.getScore());
+                    statDto.setMaxScore(bestAttempt.getMaxScore());
+                    statDto.setCompletedAt(bestAttempt.getCompletedAt());
+                    statDto.setAttemptNumber(bestAttempt.getAttemptNumber());
+                    statDto.setPercentage((double) bestAttempt.getScore() / bestAttempt.getMaxScore() * 100);
+
+                    testStats.add(statDto);
+                }
+            }
+        }
+
+        // Sort by completion date (descending)
+        testStats.sort(Comparator.comparing(SubjectStatDto::getCompletedAt).reversed());
+
+        StatisticViewDto viewDto = new StatisticViewDto();
+        viewDto.setStudentId(student.getId());
+        viewDto.setStudentName(student.getFullName());
+        viewDto.setGradeId(student.getGrade().getId());
+        viewDto.setGradeName(student.getGrade().getFullName());
+        viewDto.setSubjectId(subject.getId());
+        viewDto.setSubjectName(subject.getName());
+        viewDto.setTestStats(testStats);
+        viewDto.setCompletedTests(testStats.size());
+        viewDto.setAveragePercentage(calculateAveragePercentage(testStats));
+
+        return viewDto;
+    }
+
+    /**
+     * Get student's overall performance across all subjects
+     */
+    public Map<String, StatisticViewDto> getStudentOverallPerformance(String token, Long studentId) {
+        User currentUser = authService.getCurrentUser(token.replace("Bearer ", ""));
+
+        if (!canAccessStatistics(token, studentId, StatisticsAccessType.STUDENT)) {
+            throw new RuntimeException("You don't have permission to view this student's statistics");
+        }
+
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new RuntimeException("Student not found"));
+
         List<Subject> subjects = subjectRepository.findAll();
-        Map<String, StatisticsDto> subjectStatistics = new HashMap<>();
+        Map<String, StatisticViewDto> subjectStatistics = new HashMap<>();
 
         for (Subject subject : subjects) {
-            // Находим все результаты тестов для данного студента по данному предмету
-            List<TestResult> testResults = testResultRepository.findByStudentIdAndTestSubjectId(studentId, subject.getId());
+            List<Test> tests = testRepository.findBySubjectId(subject.getId());
+            List<SubjectStatDto> testStats = new ArrayList<>();
 
-            // Оставляем только лучшие попытки
-            List<TestResult> bestAttempts = findBestAttempts(testResults, studentId, subject.getId());
+            for (Test test : tests) {
+                List<TestResult> results = testResultRepository.findByStudentIdAndTestId(studentId, test.getId());
 
-            // Считаем статистику по лучшим попыткам
-            subjectStatistics.put(subject.getName(), calculateStatistics(bestAttempts));
+                if (!results.isEmpty()) {
+                    TestResult bestAttempt = results.stream()
+                            .max(Comparator.comparingInt(TestResult::getScore))
+                            .orElse(null);
+
+                    if (bestAttempt != null) {
+                        SubjectStatDto statDto = new SubjectStatDto();
+                        statDto.setTestId(test.getId());
+                        statDto.setTestTitle(test.getTitle());
+                        statDto.setScore(bestAttempt.getScore());
+                        statDto.setMaxScore(bestAttempt.getMaxScore());
+                        statDto.setCompletedAt(bestAttempt.getCompletedAt());
+                        statDto.setAttemptNumber(bestAttempt.getAttemptNumber());
+                        statDto.setPercentage((double) bestAttempt.getScore() / bestAttempt.getMaxScore() * 100);
+
+                        testStats.add(statDto);
+                    }
+                }
+            }
+
+            if (!testStats.isEmpty()) {
+                // Sort by completion date (descending)
+                testStats.sort(Comparator.comparing(SubjectStatDto::getCompletedAt).reversed());
+
+                StatisticViewDto viewDto = new StatisticViewDto();
+                viewDto.setStudentId(student.getId());
+                viewDto.setStudentName(student.getFullName());
+                viewDto.setGradeId(student.getGrade().getId());
+                viewDto.setGradeName(student.getGrade().getFullName());
+                viewDto.setSubjectId(subject.getId());
+                viewDto.setSubjectName(subject.getName());
+                viewDto.setTestStats(testStats);
+                viewDto.setCompletedTests(testStats.size());
+                viewDto.setAveragePercentage(calculateAveragePercentage(testStats));
+
+                subjectStatistics.put(subject.getName(), viewDto);
+            }
         }
 
         return subjectStatistics;
     }
 
+    /**
+     * Get top students in school across all subjects
+     */
+    public StatisticViewDto getTopStudentsInSchool(String token) {
+        User currentUser = authService.getCurrentUser(token.replace("Bearer ", ""));
 
-    private List<TestResult> findBestAttempts(List<TestResult> testResults, Long studentId, Long subjectId) {
-        // Группируем результаты тестов по студенту и предмету
-        Map<Long, List<TestResult>> studentSubjectResults = testResults.stream()
-                .collect(Collectors.groupingBy(tr -> tr.getTest().getId()));
+        // Only admin and teachers can view school-wide statistics
+        if (currentUser.getRole() != UserRole.ADMIN && currentUser.getRole() != UserRole.TEACHER) {
+            throw new RuntimeException("You don't have permission to view school-wide statistics");
+        }
 
-        List<TestResult> bestAttempts = new ArrayList<>();
+        List<User> students = userRepository.findByRole(UserRole.STUDENT);
+        List<UserStatDto> studentStats = new ArrayList<>();
 
-        // Для каждого теста выбираем лучший результат
-        for (List<TestResult> results : studentSubjectResults.values()) {
-            TestResult bestResult = results.stream()
-                    .max(Comparator.comparingInt(TestResult::getScore))
-                    .orElse(null);
-            if (bestResult != null) {
-                bestAttempts.add(bestResult);
+        for (User student : students) {
+            List<TestResult> allResults = testResultRepository.findByStudentId(student.getId());
+
+            // Group results by test and find best attempt for each
+            Map<Long, List<TestResult>> resultsByTest = allResults.stream()
+                    .collect(Collectors.groupingBy(r -> r.getTest().getId()));
+
+            int totalScore = 0;
+            int totalMaxScore = 0;
+            int completedTests = 0;
+
+            for (List<TestResult> testResults : resultsByTest.values()) {
+                TestResult bestAttempt = testResults.stream()
+                        .max(Comparator.comparingInt(TestResult::getScore))
+                        .orElse(null);
+
+                if (bestAttempt != null) {
+                    totalScore += bestAttempt.getScore();
+                    totalMaxScore += bestAttempt.getMaxScore();
+                    completedTests++;
+                }
+            }
+
+            if (completedTests > 0) {
+                UserStatDto statDto = new UserStatDto();
+                statDto.setUserId(student.getId());
+                statDto.setUserName(student.getFullName());
+                statDto.setGradeId(student.getGrade().getId());
+                statDto.setGradeName(student.getGrade().getFullName());
+                statDto.setScore(totalScore);
+                statDto.setMaxScore(totalMaxScore);
+                statDto.setCompletedTests(completedTests);
+                statDto.setAveragePercentage(totalMaxScore > 0 ?
+                        (double) totalScore / totalMaxScore * 100 : 0);
+
+                studentStats.add(statDto);
             }
         }
 
-        return bestAttempts;
+        // Sort by average percentage (descending)
+        studentStats.sort(Comparator.comparingDouble(UserStatDto::getAveragePercentage).reversed());
+
+        // Limit to top 20 students
+        List<UserStatDto> topStudents = studentStats.stream()
+                .limit(20)
+                .collect(Collectors.toList());
+
+        StatisticViewDto viewDto = new StatisticViewDto();
+        viewDto.setViewTitle("Top Students in School");
+        viewDto.setUserStats(topStudents);
+        viewDto.setTotalStudents(topStudents.size());
+        viewDto.setAverageScore(calculateAverageScore(topStudents));
+
+        return viewDto;
     }
 
-    private List<TestResult> findBestAttemptsForGrade(List<TestResult> testResults, Long gradeId) {
-        // Группируем результаты тестов по ученику
-        Map<Long, List<TestResult>> studentResults = testResults.stream()
-                .collect(Collectors.groupingBy(tr -> tr.getStudent().getId()));
-
-        List<TestResult> bestAttempts = new ArrayList<>();
-
-        // Для каждого ученика выбираем лучший результат
-        for (List<TestResult> results : studentResults.values()) {
-            TestResult bestResult = results.stream()
-                    .max(Comparator.comparingInt(TestResult::getScore))
-                    .orElse(null);
-            if (bestResult != null) {
-                bestAttempts.add(bestResult);
-            }
+    // Helper methods
+    private double calculateAverageScore(List<UserStatDto> stats) {
+        if (stats.isEmpty()) {
+            return 0.0;
         }
 
-        return bestAttempts;
+        double totalPercentage = stats.stream()
+                .mapToDouble(UserStatDto::getAveragePercentage)
+                .sum();
+
+        return totalPercentage / stats.size();
     }
 
-    private List<TestResult> findBestAttemptForStudentTest(List<TestResult> testResults, Long studentId, Long testId) {
-        // Если нет результатов, возвращаем пустой список
-        if (testResults.isEmpty()) {
-            return Collections.emptyList();
+    private double calculateAveragePercentage(List<SubjectStatDto> stats) {
+        if (stats.isEmpty()) {
+            return 0.0;
         }
 
-        // Находим лучший результат
-        TestResult bestResult = testResults.stream()
-                .max(Comparator.comparingInt(TestResult::getScore))
-                .orElse(null);
+        double totalPercentage = stats.stream()
+                .mapToDouble(SubjectStatDto::getPercentage)
+                .sum();
 
-        // Возвращаем список, содержащий только лучший результат (или пустой список, если результатов нет)
-        return (bestResult != null) ? Collections.singletonList(bestResult) : Collections.emptyList();
+        return totalPercentage / stats.size();
     }
 
-    private StatisticsDto calculateStatistics(List<TestResult> testResults) {
-        if (testResults.isEmpty()) {
-            return new StatisticsDto(); // Return default StatisticsDto
-        }
-
-        double averageScore = testResults.stream()
-                .mapToInt(TestResult::getScore)
-                .average()
-                .orElse(0.0);
-
-        int minScore = testResults.stream()
-                .mapToInt(TestResult::getScore)
-                .min()
-                .orElse(0);
-
-        int maxScore = testResults.stream()
-                .mapToInt(TestResult::getScore)
-                .max()
-                .orElse(0);
-
-        StatisticsDto statisticsDto = new StatisticsDto();
-        statisticsDto.setAverageScore(averageScore);
-        statisticsDto.setMinScore(minScore);
-        statisticsDto.setMaxScore(maxScore);
-
-        return statisticsDto;
+    // Enum for statistics access type
+    public enum StatisticsAccessType {
+        TEST_RESULT,
+        STUDENT,
+        GRADE,
+        SUBJECT
     }
 }
