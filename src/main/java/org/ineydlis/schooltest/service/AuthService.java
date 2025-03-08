@@ -49,6 +49,7 @@ public class AuthService {
 
         // Создаем базовый ответ
         LoginResponse.LoginResponseBuilder responseBuilder = LoginResponse.builder()
+                .id(user.getId())
                 .token(token)
                 .username(user.getUsername())
                 .fullName(user.getFullName())

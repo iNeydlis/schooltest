@@ -20,6 +20,9 @@ public class StatisticsController {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleException(RuntimeException ex) {
+        System.err.println("Обрабатывается исключение в контроллере: " + ex.getMessage());
+        ex.printStackTrace();
+
         Map<String, Object> body = new HashMap<>();
         body.put("message", ex.getMessage());
         body.put("status", 403);

@@ -66,14 +66,21 @@ public class StatisticsService {
     }
 
     private boolean canAccessStudentStatistics(User currentUser, Long studentId) {
+        System.out.println("Проверка доступа к статистике студента");
+        System.out.println("Текущий пользователь ID: " + currentUser.getId() + ", Имя: " + currentUser.getFullName() + ", Роль: " + currentUser.getRole());
+        System.out.println("Запрашиваемый студент ID: " + studentId);
+
         // Admin can access any student's statistics
         if (currentUser.getRole() == UserRole.ADMIN) {
+            System.out.println("Доступ разрешен (администратор)");
             return true;
         }
 
         // Students can only access their own statistics
         if (currentUser.getRole() == UserRole.STUDENT) {
-            return currentUser.getId().equals(studentId);
+            boolean hasAccess = currentUser.getId().equals(studentId);
+            System.out.println("Студент запрашивает: " + (hasAccess ? "свою статистику (доступ разрешен)" : "чужую статистику (доступ запрещен)"));
+            return hasAccess;
         }
 
         // Teachers can access statistics for students in their classes/subjects
@@ -190,7 +197,9 @@ public class StatisticsService {
 
         resultsByStudent.forEach((studentId, results) -> {
             TestResult bestAttempt = results.stream()
-                    .max(Comparator.comparingInt(TestResult::getScore))
+                    .max(Comparator.comparing(
+                            TestResult::getScore,
+                            Comparator.nullsLast(Integer::compareTo)))
                     .orElse(null);
 
             if (bestAttempt != null) {
@@ -457,6 +466,7 @@ public class StatisticsService {
 
                 if (!results.isEmpty()) {
                     TestResult bestAttempt = results.stream()
+                            .filter(r -> r.getScore() != null)
                             .max(Comparator.comparingInt(TestResult::getScore))
                             .orElse(null);
 
