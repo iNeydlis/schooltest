@@ -12,6 +12,7 @@ import TestResultsList from './pages/TestResultsList';
 import Header from './components/Header';
 import Loading from './components/Loading';
 import TestResultDetails from "./pages/TestResultDetails.jsx";
+import StatisticsPage from "./pages/StatisticsPage.jsx";
 
 const App = () => {
     const { user, loading } = useContext(AuthContext);
@@ -51,7 +52,15 @@ const App = () => {
                                     <TestForm /> : <Navigate to="/tests" />
                             }
                         />
-
+                        <Route
+                            path="/statistics"
+                            element={
+                                user && (user.role === 'TEACHER' || user.role === 'ADMIN'
+                                || user.role === 'STUDENT'
+                                ) ?
+                                    <StatisticsPage /> : <Navigate to="/tests" />
+                            }
+                        />
                         {/* Редактирование теста: только для учителей и админов */}
                         <Route
                             path="/tests/:testId/edit"
