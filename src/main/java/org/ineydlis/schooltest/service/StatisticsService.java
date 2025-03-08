@@ -196,25 +196,30 @@ public class StatisticsService {
         List<UserStatDto> studentStats = new ArrayList<>();
 
         resultsByStudent.forEach((studentId, results) -> {
-            TestResult bestAttempt = results.stream()
-                    .max(Comparator.comparing(
-                            TestResult::getScore,
-                            Comparator.nullsLast(Integer::compareTo)))
-                    .orElse(null);
+            // Фильтруем результаты, чтобы включать только те, где score не null
+            List<TestResult> validResults = results.stream()
+                    .filter(r -> r.getScore() != null)
+                    .collect(Collectors.toList());
 
-            if (bestAttempt != null) {
-                User student = bestAttempt.getStudent();
-                UserStatDto statDto = new UserStatDto();
-                statDto.setUserId(student.getId());
-                statDto.setUserName(student.getFullName());
-                statDto.setGradeId(student.getGrade().getId());
-                statDto.setGradeName(student.getGrade().getFullName());
-                statDto.setScore(bestAttempt.getScore());
-                statDto.setMaxScore(bestAttempt.getMaxScore());
-                statDto.setCompletedAt(bestAttempt.getCompletedAt());
-                statDto.setAttemptNumber(bestAttempt.getAttemptNumber());
+            if (!validResults.isEmpty()) {
+                TestResult bestAttempt = validResults.stream()
+                        .max(Comparator.comparing(TestResult::getScore))
+                        .orElse(null);
 
-                studentStats.add(statDto);
+                if (bestAttempt != null) {
+                    User student = bestAttempt.getStudent();
+                    UserStatDto statDto = new UserStatDto();
+                    statDto.setUserId(student.getId());
+                    statDto.setUserName(student.getFullName());
+                    statDto.setGradeId(student.getGrade().getId());
+                    statDto.setGradeName(student.getGrade().getFullName());
+                    statDto.setScore(bestAttempt.getScore());
+                    statDto.setMaxScore(bestAttempt.getMaxScore());
+                    statDto.setCompletedAt(bestAttempt.getCompletedAt());
+                    statDto.setAttemptNumber(bestAttempt.getAttemptNumber());
+
+                    studentStats.add(statDto);
+                }
             }
         });
 
@@ -261,14 +266,21 @@ public class StatisticsService {
             int completedTests = 0;
 
             for (List<TestResult> testResults : resultsByTest.values()) {
-                TestResult bestAttempt = testResults.stream()
-                        .max(Comparator.comparingInt(TestResult::getScore))
-                        .orElse(null);
+                // Отфильтровываем результаты с null значениями score
+                List<TestResult> validResults = testResults.stream()
+                        .filter(r -> r.getScore() != null)
+                        .collect(Collectors.toList());
 
-                if (bestAttempt != null) {
-                    totalScore += bestAttempt.getScore();
-                    totalMaxScore += bestAttempt.getMaxScore();
-                    completedTests++;
+                if (!validResults.isEmpty()) {
+                    TestResult bestAttempt = validResults.stream()
+                            .max(Comparator.comparingInt(TestResult::getScore))
+                            .orElse(null);
+
+                    if (bestAttempt != null) {
+                        totalScore += bestAttempt.getScore();
+                        totalMaxScore += bestAttempt.getMaxScore();
+                        completedTests++;
+                    }
                 }
             }
 
@@ -339,14 +351,21 @@ public class StatisticsService {
             int completedTests = 0;
 
             for (List<TestResult> testResults : resultsByTest.values()) {
-                TestResult bestAttempt = testResults.stream()
-                        .max(Comparator.comparingInt(TestResult::getScore))
-                        .orElse(null);
+                // Фильтруем результаты, чтобы исключить те, где score равен null
+                List<TestResult> validResults = testResults.stream()
+                        .filter(r -> r.getScore() != null)
+                        .collect(Collectors.toList());
 
-                if (bestAttempt != null) {
-                    totalScore += bestAttempt.getScore();
-                    totalMaxScore += bestAttempt.getMaxScore();
-                    completedTests++;
+                if (!validResults.isEmpty()) {
+                    TestResult bestAttempt = validResults.stream()
+                            .max(Comparator.comparingInt(TestResult::getScore))
+                            .orElse(null);
+
+                    if (bestAttempt != null) {
+                        totalScore += bestAttempt.getScore();
+                        totalMaxScore += bestAttempt.getMaxScore();
+                        completedTests++;
+                    }
                 }
             }
 
@@ -404,8 +423,13 @@ public class StatisticsService {
         for (Test test : tests) {
             List<TestResult> results = testResultRepository.findByStudentIdAndTestId(studentId, test.getId());
 
-            if (!results.isEmpty()) {
-                TestResult bestAttempt = results.stream()
+            // Фильтруем результаты, чтобы исключить те, где score равен null
+            List<TestResult> validResults = results.stream()
+                    .filter(r -> r.getScore() != null)
+                    .collect(Collectors.toList());
+
+            if (!validResults.isEmpty()) {
+                TestResult bestAttempt = validResults.stream()
                         .max(Comparator.comparingInt(TestResult::getScore))
                         .orElse(null);
 
@@ -430,8 +454,17 @@ public class StatisticsService {
         StatisticViewDto viewDto = new StatisticViewDto();
         viewDto.setStudentId(student.getId());
         viewDto.setStudentName(student.getFullName());
-        viewDto.setGradeId(student.getGrade().getId());
-        viewDto.setGradeName(student.getGrade().getFullName());
+
+        // Проверка на null перед обращением к Grade
+        if (student.getGrade() != null) {
+            viewDto.setGradeId(student.getGrade().getId());
+            viewDto.setGradeName(student.getGrade().getFullName());
+        } else {
+            // Установка значений по умолчанию или null
+            viewDto.setGradeId(null);
+            viewDto.setGradeName("Класс не назначен");
+        }
+
         viewDto.setSubjectId(subject.getId());
         viewDto.setSubjectName(subject.getName());
         viewDto.setTestStats(testStats);
@@ -533,7 +566,9 @@ public class StatisticsService {
             int completedTests = 0;
 
             for (List<TestResult> testResults : resultsByTest.values()) {
+                // Fixed: Filter out null objects and null scores before comparing
                 TestResult bestAttempt = testResults.stream()
+                        .filter(result -> result != null && result.getScore() != null)
                         .max(Comparator.comparingInt(TestResult::getScore))
                         .orElse(null);
 
@@ -569,7 +604,7 @@ public class StatisticsService {
                 .collect(Collectors.toList());
 
         StatisticViewDto viewDto = new StatisticViewDto();
-        viewDto.setViewTitle("Top Students in School");
+        viewDto.setViewTitle("Лучшие ученики школы");
         viewDto.setUserStats(topStudents);
         viewDto.setTotalStudents(topStudents.size());
         viewDto.setAverageScore(calculateAverageScore(topStudents));

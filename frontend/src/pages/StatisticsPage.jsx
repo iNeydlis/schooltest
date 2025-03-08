@@ -33,7 +33,28 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, AreaChart, Area } from 'recharts';
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer,
+    LineChart,
+    Line,
+    PieChart,
+    Pie,
+    Cell,
+    RadarChart,
+    Radar,
+    PolarGrid,
+    PolarAngleAxis,
+    PolarRadiusAxis,
+    AreaChart,
+    Area
+} from 'recharts';
 
 const StatisticsPage = () => {
     const { user } = useContext(AuthContext);
@@ -121,25 +142,31 @@ const StatisticsPage = () => {
 
     // Prepare data for charts
     const prepareOverviewChartData = () => {
+        if (!statistics || Object.keys(statistics).length === 0) {
+            return [];
+        }
+
         return Object.entries(statistics).map(([subjectName, data], index) => ({
             name: subjectName,
-            Результат: data.averagePercentage,
-            Тесты: data.completedTests,
+            Результат: data.averagePercentage || 0,
+            Тесты: data.completedTests || 0,
             fill: COLORS[index % COLORS.length]
         }));
     };
 
     const prepareSubjectTestsData = () => {
-        if (!selectedSubjectData || !selectedSubjectData.testStats) return [];
+        if (!selectedSubjectData || !selectedSubjectData.testStats || !Array.isArray(selectedSubjectData.testStats)) {
+            return [];
+        }
 
         return selectedSubjectData.testStats.map((test, index) => ({
             name: test.testTitle.length > 15 ? test.testTitle.substring(0, 15) + '...' : test.testTitle,
             fullName: test.testTitle,
-            Результат: test.percentage,
-            Баллы: (test.score / test.maxScore) * 100,
-            Попытка: test.attemptNumber,
+            Результат: test.percentage || 0,
+            Баллы: test.maxScore > 0 ? ((test.score / test.maxScore) * 100) || 0 : 0,
+            Попытка: test.attemptNumber || 1,
             Дата: formatDate(test.completedAt),
-            color: getPerformanceColorHex(test.percentage)
+            color: getPerformanceColorHex(test.percentage || 0)
         }));
     };
 
@@ -150,8 +177,8 @@ const StatisticsPage = () => {
                 <div className="bg-white p-2 border border-gray-200 shadow-md rounded">
                     <p className="font-bold">{payload[0].payload.fullName || label}</p>
                     {payload.map((entry, index) => (
-                        <p key={index} style={{ color: entry.color }}>
-                            {entry.name}: {entry.value.toFixed(1)}%
+                        <p key={index} style={{ color: entry.color || '#000' }}>
+                            {entry.name}: {(typeof entry.value === 'number' ? entry.value.toFixed(1) : entry.value)}%
                         </p>
                     ))}
                     {payload[0].payload.Дата && <p>Дата: {payload[0].payload.Дата}</p>}
@@ -196,10 +223,14 @@ const StatisticsPage = () => {
 
     // Get aggregate stats across all subjects
     const aggregateStats = {
-        totalTests: Object.values(statistics).reduce((sum, subject) => sum + subject.completedTests, 0),
-        averagePerformance: Object.values(statistics).reduce((sum, subject) => sum + subject.averagePercentage, 0) /
-            (Object.values(statistics).length || 1)
+        totalTests: Object.values(statistics).reduce((sum, subject) => sum + (subject.completedTests || 0), 0),
+        averagePerformance: Object.values(statistics).length > 0 ?
+            Object.values(statistics).reduce((sum, subject) => sum + (subject.averagePercentage || 0), 0) / Object.values(statistics).length : 0
     };
+
+    // Prepare chart data and ensure it's not empty
+    const overviewChartData = prepareOverviewChartData();
+    const subjectTestsData = prepareSubjectTestsData();
 
     return (
         <div className="container mx-auto p-4">
@@ -282,24 +313,24 @@ const StatisticsPage = () => {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            {Object.keys(statistics).length > 0 ? (
+                            {overviewChartData.length > 0 ? (
                                 <div className="h-80 w-full">
                                     <ResponsiveContainer width="100%" height="100%">
                                         {chartType === 'bar' && (
                                             <BarChart
-                                                data={prepareOverviewChartData()}
+                                                data={overviewChartData}
                                                 margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                                             >
                                                 <CartesianGrid strokeDasharray="3 3" />
                                                 <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
-                                                <YAxis />
+                                                <YAxis domain={[0, 100]} />
                                                 <Tooltip content={<CustomTooltip />} />
                                                 <Legend />
                                                 <Bar dataKey="Результат" fill="#8884d8" />
                                             </BarChart>
                                         )}
                                         {chartType === 'radar' && (
-                                            <RadarChart outerRadius={100} data={prepareOverviewChartData()}>
+                                            <RadarChart outerRadius={90} width={500} height={250} data={overviewChartData}>
                                                 <PolarGrid />
                                                 <PolarAngleAxis dataKey="name" />
                                                 <PolarRadiusAxis angle={30} domain={[0, 100]} />
@@ -309,18 +340,17 @@ const StatisticsPage = () => {
                                             </RadarChart>
                                         )}
                                         {chartType === 'pie' && (
-                                            <PieChart>
+                                            <PieChart width={400} height={300}>
                                                 <Pie
-                                                    data={prepareOverviewChartData()}
+                                                    data={overviewChartData}
+                                                    dataKey="Результат"
+                                                    nameKey="name"
                                                     cx="50%"
                                                     cy="50%"
-                                                    labelLine={true}
-                                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                                    outerRadius={100}
-                                                    fill="#8884d8"
-                                                    dataKey="Результат"
+                                                    outerRadius={80}
+                                                    label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
                                                 >
-                                                    {prepareOverviewChartData().map((entry, index) => (
+                                                    {overviewChartData.map((entry, index) => (
                                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                     ))}
                                                 </Pie>
@@ -358,24 +388,24 @@ const StatisticsPage = () => {
                                                     <div className="flex justify-between text-sm">
                                                         <span>Средний результат:</span>
                                                         <span className={getPerformanceColor(data.averagePercentage)}>
-                                                            {data.averagePercentage.toFixed(1)}%
+                                                            {data.averagePercentage ? data.averagePercentage.toFixed(1) : '0.0'}%
                                                         </span>
                                                     </div>
                                                     <Progress
-                                                        value={data.averagePercentage}
+                                                        value={data.averagePercentage || 0}
                                                         className="h-2"
                                                         style={{
                                                             background: 'rgba(0,0,0,0.1)',
-                                                            ['--progress-background']: getPerformanceColorHex(data.averagePercentage)
+                                                            ['--progress-background']: getPerformanceColorHex(data.averagePercentage || 0)
                                                         }}
                                                     />
                                                     <div className="flex justify-between text-sm">
                                                         <span>Выполнено тестов:</span>
-                                                        <span>{data.completedTests}</span>
+                                                        <span>{data.completedTests || 0}</span>
                                                     </div>
                                                     <div className="flex justify-between text-sm">
                                                         <span>Класс:</span>
-                                                        <span>{data.gradeName}</span>
+                                                        <span>{data.gradeName || 'Н/Д'}</span>
                                                     </div>
                                                 </div>
                                             </CardContent>
@@ -402,7 +432,7 @@ const StatisticsPage = () => {
                         <CardContent>
                             <div className="mb-4">
                                 <Select
-                                    value={selectedSubject?.toString()}
+                                    value={selectedSubject ? selectedSubject.toString() : ''}
                                     onValueChange={handleSubjectChange}
                                 >
                                     <SelectTrigger className="w-full md:w-1/3">
@@ -421,22 +451,22 @@ const StatisticsPage = () => {
                             {selectedSubjectData ? (
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <Card className="border-t-4" style={{ borderTopColor: getPerformanceColorHex(selectedSubjectData.averagePercentage) }}>
+                                        <Card className="border-t-4" style={{ borderTopColor: getPerformanceColorHex(selectedSubjectData.averagePercentage || 0) }}>
                                             <CardHeader className="p-4 pb-0">
                                                 <CardTitle className="text-sm font-medium">Средний результат</CardTitle>
                                             </CardHeader>
                                             <CardContent className="p-4">
                                                 <div className="text-2xl font-bold">
-                                                    <span className={getPerformanceColor(selectedSubjectData.averagePercentage)}>
-                                                        {selectedSubjectData.averagePercentage.toFixed(1)}%
+                                                    <span className={getPerformanceColor(selectedSubjectData.averagePercentage || 0)}>
+                                                        {selectedSubjectData.averagePercentage ? selectedSubjectData.averagePercentage.toFixed(1) : '0.0'}%
                                                     </span>
                                                 </div>
                                                 <Progress
-                                                    value={selectedSubjectData.averagePercentage}
+                                                    value={selectedSubjectData.averagePercentage || 0}
                                                     className="h-2 mt-2"
                                                     style={{
                                                         background: 'rgba(0,0,0,0.1)',
-                                                        ['--progress-background']: getPerformanceColorHex(selectedSubjectData.averagePercentage)
+                                                        ['--progress-background']: getPerformanceColorHex(selectedSubjectData.averagePercentage || 0)
                                                     }}
                                                 />
                                             </CardContent>
@@ -447,7 +477,7 @@ const StatisticsPage = () => {
                                             </CardHeader>
                                             <CardContent className="p-4">
                                                 <div className="text-2xl font-bold">
-                                                    {selectedSubjectData.completedTests}
+                                                    {selectedSubjectData.completedTests || 0}
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -457,7 +487,7 @@ const StatisticsPage = () => {
                                             </CardHeader>
                                             <CardContent className="p-4">
                                                 <div className="text-2xl font-bold">
-                                                    {selectedSubjectData.gradeName}
+                                                    {selectedSubjectData.gradeName || 'Н/Д'}
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -490,7 +520,7 @@ const StatisticsPage = () => {
                                                     <div className="h-80 w-full">
                                                         <ResponsiveContainer width="100%" height="100%">
                                                             <AreaChart
-                                                                data={prepareSubjectTestsData().sort((a, b) => b.Дата.localeCompare(a.Дата))}
+                                                                data={subjectTestsData}
                                                                 margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
                                                             >
                                                                 <CartesianGrid strokeDasharray="3 3" />
@@ -505,7 +535,7 @@ const StatisticsPage = () => {
                                                     </div>
                                                 ) : (
                                                     <Table>
-                                                        <TableCaption>Результаты тестов по предмету "{subjects.find(s => s.id === selectedSubject)?.name}"</TableCaption>
+                                                        <TableCaption>Результаты тестов по предмету "{subjects.find(s => s.id === selectedSubject)?.name || ''}"</TableCaption>
                                                         <TableHeader>
                                                             <TableRow>
                                                                 <TableHead>Тест</TableHead>
@@ -516,22 +546,22 @@ const StatisticsPage = () => {
                                                             </TableRow>
                                                         </TableHeader>
                                                         <TableBody>
-                                                            {selectedSubjectData.testStats.map((test) => (
-                                                                <TableRow key={test.testId}>
+                                                            {selectedSubjectData.testStats.map((test, index) => (
+                                                                <TableRow key={`${test.testId}-${index}`}>
                                                                     <TableCell className="font-medium">{test.testTitle}</TableCell>
-                                                                    <TableCell className="text-right">{test.score} / {test.maxScore}</TableCell>
+                                                                    <TableCell className="text-right">{test.score || 0} / {test.maxScore || 0}</TableCell>
                                                                     <TableCell className="text-right">
                                                                         <Badge className={
-                                                                            test.percentage >= 90 ? "bg-green-500" :
-                                                                                test.percentage >= 75 ? "bg-emerald-500" :
-                                                                                    test.percentage >= 60 ? "bg-amber-500" :
+                                                                            (test.percentage || 0) >= 90 ? "bg-green-500" :
+                                                                                (test.percentage || 0) >= 75 ? "bg-emerald-500" :
+                                                                                    (test.percentage || 0) >= 60 ? "bg-amber-500" :
                                                                                         "bg-red-500"
                                                                         }>
-                                                                            {test.percentage.toFixed(1)}%
+                                                                            {test.percentage ? test.percentage.toFixed(1) : '0.0'}%
                                                                         </Badge>
                                                                     </TableCell>
                                                                     <TableCell className="text-right">{formatDate(test.completedAt)}</TableCell>
-                                                                    <TableCell className="text-right">{test.attemptNumber}</TableCell>
+                                                                    <TableCell className="text-right">{test.attemptNumber || 1}</TableCell>
                                                                 </TableRow>
                                                             ))}
                                                         </TableBody>
