@@ -38,4 +38,23 @@ public interface TestResultRepository extends JpaRepository<TestResult, Long> {
             @Param("test") Test test,
             @Param("student") User student,
             @Param("completed") boolean completed);
+
+    @Query("SELECT tr FROM TestResult tr WHERE tr.student.id = :studentId AND tr.test.subject.id = :subjectId AND tr.completed = true")
+    List<TestResult> findByStudentIdAndTestSubjectId(Long studentId, Long subjectId);
+
+    // Найти все результаты тестов для конкретного класса
+    @Query("SELECT tr FROM TestResult tr WHERE tr.student.grade.id = :gradeId AND tr.completed = true")
+    List<TestResult> findByStudentGradeId(Long gradeId);
+
+    // Найти все завершенные тесты
+    @Query("SELECT tr FROM TestResult tr WHERE tr.completed = true")
+    List<TestResult> findAllCompleted();
+
+    // Найти все результаты для конкретного теста
+    List<TestResult> findByTestIdAndCompleted(Long testId, boolean completed);
+
+    // Найти все попытки конкретного ученика по конкретному тесту
+    List<TestResult> findByStudentIdAndTestId(Long studentId, Long testId);
+
+
 }

@@ -1,11 +1,16 @@
 package org.ineydlis.schooltest.dto;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.ineydlis.schooltest.model.*;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Setter
+@Getter
 public class StudentAnswerDto {
+    // Getters and setters
     private Long id;
     private Long questionId;
     private String questionText;
@@ -16,87 +21,6 @@ public class StudentAnswerDto {
     private boolean correct;
     private int earnedPoints;
     private int maxPoints;
-
-    // Getters and setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public Long getQuestionId() {
-        return questionId;
-    }
-
-    public void setQuestionId(Long questionId) {
-        this.questionId = questionId;
-    }
-
-    public String getQuestionText() {
-        return questionText;
-    }
-
-    public void setQuestionText(String questionText) {
-        this.questionText = questionText;
-    }
-
-    public QuestionType getQuestionType() {
-        return questionType;
-    }
-
-    public void setQuestionType(QuestionType questionType) {
-        this.questionType = questionType;
-    }
-
-    public String getTextAnswer() {
-        return textAnswer;
-    }
-
-    public void setTextAnswer(String textAnswer) {
-        this.textAnswer = textAnswer;
-    }
-
-    public Set<AnswerDto> getSelectedAnswers() {
-        return selectedAnswers;
-    }
-
-    public void setSelectedAnswers(Set<AnswerDto> selectedAnswers) {
-        this.selectedAnswers = selectedAnswers;
-    }
-
-    public Set<AnswerDto> getCorrectAnswers() {
-        return correctAnswers;
-    }
-
-    public void setCorrectAnswers(Set<AnswerDto> correctAnswers) {
-        this.correctAnswers = correctAnswers;
-    }
-
-    public boolean isCorrect() {
-        return correct;
-    }
-
-    public void setCorrect(boolean correct) {
-        this.correct = correct;
-    }
-
-    public int getEarnedPoints() {
-        return earnedPoints;
-    }
-
-    public void setEarnedPoints(int earnedPoints) {
-        this.earnedPoints = earnedPoints;
-    }
-
-    public int getMaxPoints() {
-        return maxPoints;
-    }
-
-    public void setMaxPoints(int maxPoints) {
-        this.maxPoints = maxPoints;
-    }
 
     // Factory method to create from entity
     public static StudentAnswerDto fromEntity(StudentAnswer studentAnswer) {
