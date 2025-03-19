@@ -497,10 +497,17 @@ public class StatisticsService {
             for (Test test : tests) {
                 List<TestResult> results = testResultRepository.findByStudentIdAndTestId(studentId, test.getId());
 
-                if (!results.isEmpty()) {
-                    TestResult bestAttempt = results.stream()
-                            .filter(r -> r.getScore() != null)
-                            .max(Comparator.comparingInt(TestResult::getScore))
+                // Filter only completed attempts
+                List<TestResult> completedResults = results.stream()
+                        .filter(TestResult::isCompleted)
+                        .filter(r -> r.getScore() != null && r.getMaxScore() != null && r.getMaxScore() > 0)
+                        .collect(Collectors.toList());
+
+                if (!completedResults.isEmpty()) {
+                    // Find the best attempt based on percentage score rather than raw score
+                    TestResult bestAttempt = completedResults.stream()
+                            .max(Comparator.comparingDouble(r ->
+                                    (double) r.getScore() / r.getMaxScore()))
                             .orElse(null);
 
                     if (bestAttempt != null) {
@@ -511,7 +518,10 @@ public class StatisticsService {
                         statDto.setMaxScore(bestAttempt.getMaxScore());
                         statDto.setCompletedAt(bestAttempt.getCompletedAt());
                         statDto.setAttemptNumber(bestAttempt.getAttemptNumber());
-                        statDto.setPercentage((double) bestAttempt.getScore() / bestAttempt.getMaxScore() * 100);
+
+                        // Calculate percentage based on the actual questions shown to the student
+                        double percentage = (double) bestAttempt.getScore() / bestAttempt.getMaxScore() * 100;
+                        statDto.setPercentage(Math.round(percentage * 100) / 100.0); // Round to 2 decimal places
 
                         testStats.add(statDto);
                     }
@@ -531,6 +541,8 @@ public class StatisticsService {
                 viewDto.setSubjectName(subject.getName());
                 viewDto.setTestStats(testStats);
                 viewDto.setCompletedTests(testStats.size());
+
+                // Calculate the average percentage more accurately
                 viewDto.setAveragePercentage(calculateAveragePercentage(testStats));
 
                 subjectStatistics.put(subject.getName(), viewDto);
@@ -539,6 +551,7 @@ public class StatisticsService {
 
         return subjectStatistics;
     }
+
 
     /**
      * Get top students in school across all subjects
