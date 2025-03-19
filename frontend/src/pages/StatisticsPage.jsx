@@ -7,6 +7,7 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
+    CardFooter,
 } from "@/components/ui/card";
 import {
     Tabs,
@@ -33,28 +34,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
-    LineChart,
-    Line,
-    PieChart,
-    Pie,
-    Cell,
-    RadarChart,
-    Radar,
-    PolarGrid,
-    PolarAngleAxis,
-    PolarRadiusAxis,
-    AreaChart,
-    Area
-} from 'recharts';
+import { TrendingUp, Book, CheckCircle, BarChart2, Award, ArrowRight } from "lucide-react";
 
 const StatisticsPage = () => {
     const { user } = useContext(AuthContext);
@@ -64,11 +44,9 @@ const StatisticsPage = () => {
     const [subjects, setSubjects] = useState([]);
     const [selectedSubject, setSelectedSubject] = useState(null);
     const [selectedSubjectData, setSelectedSubjectData] = useState(null);
-    const [performanceView, setPerformanceView] = useState('chart');
-    const [chartType, setChartType] = useState('bar');
+    const [performanceView, setPerformanceView] = useState('table');
 
-    // Цветовая схема для графиков
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A259FF', '#4CAF50', '#F44336', '#3F51B5', '#2196F3', '#009688'];
+    // Цветовая схема
     const GRADE_COLORS = {
         excellent: '#10B981', // Зеленый
         good: '#3B82F6',      // Синий
@@ -127,12 +105,12 @@ const StatisticsPage = () => {
     // Helper to get a performance color class based on percentage
     const getPerformanceColor = (percentage) => {
         if (percentage >= 90) return 'text-green-600';
-        if (percentage >= 75) return 'text-emerald-500';
-        if (percentage >= 60) return 'text-amber-500';
-        return 'text-red-500';
+        if (percentage >= 75) return 'text-blue-600';
+        if (percentage >= 60) return 'text-amber-600';
+        return 'text-red-600';
     };
 
-    // Helper to get performance color for charts
+    // Helper to get performance color for styling
     const getPerformanceColorHex = (percentage) => {
         if (percentage >= 90) return GRADE_COLORS.excellent;
         if (percentage >= 75) return GRADE_COLORS.good;
@@ -140,60 +118,21 @@ const StatisticsPage = () => {
         return GRADE_COLORS.poor;
     };
 
-    // Prepare data for charts
-    const prepareOverviewChartData = () => {
-        if (!statistics || Object.keys(statistics).length === 0) {
-            return [];
-        }
-
-        return Object.entries(statistics).map(([subjectName, data], index) => ({
-            name: subjectName,
-            Результат: data.averagePercentage || 0,
-            Тесты: data.completedTests || 0,
-            fill: COLORS[index % COLORS.length]
-        }));
-    };
-
-    const prepareSubjectTestsData = () => {
-        if (!selectedSubjectData || !selectedSubjectData.testStats || !Array.isArray(selectedSubjectData.testStats)) {
-            return [];
-        }
-
-        return selectedSubjectData.testStats.map((test, index) => ({
-            name: test.testTitle.length > 15 ? test.testTitle.substring(0, 15) + '...' : test.testTitle,
-            fullName: test.testTitle,
-            Результат: test.percentage || 0,
-            Баллы: test.maxScore > 0 ? ((test.score / test.maxScore) * 100) || 0 : 0,
-            Попытка: test.attemptNumber || 1,
-            Дата: formatDate(test.completedAt),
-            color: getPerformanceColorHex(test.percentage || 0)
-        }));
-    };
-
-    // Custom tooltip for charts
-    const CustomTooltip = ({ active, payload, label }) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-white p-2 border border-gray-200 shadow-md rounded">
-                    <p className="font-bold">{payload[0].payload.fullName || label}</p>
-                    {payload.map((entry, index) => (
-                        <p key={index} style={{ color: entry.color || '#000' }}>
-                            {entry.name}: {(typeof entry.value === 'number' ? entry.value.toFixed(1) : entry.value)}%
-                        </p>
-                    ))}
-                    {payload[0].payload.Дата && <p>Дата: {payload[0].payload.Дата}</p>}
-                    {payload[0].payload.Попытка && <p>Попытка: {payload[0].payload.Попытка}</p>}
-                </div>
-            );
-        }
-        return null;
+    // Helper to get performance text
+    const getPerformanceText = (percentage) => {
+        if (percentage >= 90) return 'Отлично';
+        if (percentage >= 75) return 'Хорошо';
+        if (percentage >= 60) return 'Удовлетворительно';
+        return 'Требует улучшения';
     };
 
     if (user.role !== 'STUDENT') {
         return (
             <div className="container mx-auto p-4">
-                <h2 className="text-2xl font-bold mb-4">Статистика</h2>
-                <p>Статистика доступна только для учеников.</p>
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-xl text-white mb-6">
+                    <h2 className="text-3xl font-bold">Статистика</h2>
+                    <p className="opacity-80 mt-2">Статистика доступна только для учеников.</p>
+                </div>
             </div>
         );
     }
@@ -201,10 +140,13 @@ const StatisticsPage = () => {
     if (loading) {
         return (
             <div className="container mx-auto p-4">
-                <h2 className="text-2xl font-bold mb-4">Статистика</h2>
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-xl text-white mb-6">
+                    <h2 className="text-3xl font-bold">Статистика</h2>
+                    <p className="opacity-80 mt-2">Загрузка данных...</p>
+                </div>
                 <div className="grid gap-4">
-                    <Skeleton className="h-[150px] w-full" />
-                    <Skeleton className="h-[400px] w-full" />
+                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-64 w-full" />
                 </div>
             </div>
         );
@@ -213,9 +155,13 @@ const StatisticsPage = () => {
     if (error) {
         return (
             <div className="container mx-auto p-4">
-                <h2 className="text-2xl font-bold mb-4">Статистика</h2>
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                    <p>Произошла ошибка: {error}</p>
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-xl text-white mb-6">
+                    <h2 className="text-3xl font-bold">Статистика</h2>
+                    <p className="opacity-80 mt-2">Произошла ошибка при загрузке данных</p>
+                </div>
+                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow">
+                    <p className="font-medium">Произошла ошибка:</p>
+                    <p>{error}</p>
                 </div>
             </div>
         );
@@ -228,192 +174,122 @@ const StatisticsPage = () => {
             Object.values(statistics).reduce((sum, subject) => sum + (subject.averagePercentage || 0), 0) / Object.values(statistics).length : 0
     };
 
-    // Prepare chart data and ensure it's not empty
-    const overviewChartData = prepareOverviewChartData();
-    const subjectTestsData = prepareSubjectTestsData();
-
     return (
         <div className="container mx-auto p-4">
-            <h2 className="text-2xl font-bold mb-4">Моя статистика</h2>
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 md:p-8 rounded-xl text-white mb-6 shadow-lg">
+                <h2 className="text-3xl font-bold flex items-center">
+                    <BarChart2 className="mr-3" size={32} />
+                    Моя статистика
+                </h2>
+                <p className="opacity-80 mt-2 text-lg">Отслеживайте свой прогресс и достижения</p>
 
-            <Tabs defaultValue="performance" className="w-full mb-6">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="performance">Общая статистика</TabsTrigger>
-                    <TabsTrigger value="bySubject">По предметам</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="performance" className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <Card>
-                            <CardHeader className="p-4 pb-0">
-                                <CardTitle className="text-sm font-medium">Средний результат</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4">
-                                <div className="text-2xl font-bold">
-                                    <span className={getPerformanceColor(aggregateStats.averagePerformance)}>
-                                        {aggregateStats.averagePerformance.toFixed(1)}%
-                                    </span>
-                                </div>
-                                <Progress value={aggregateStats.averagePerformance}
-                                          className="h-2 mt-2"
-                                          style={{
-                                              background: 'rgba(0,0,0,0.1)',
-                                              ['--progress-background']: getPerformanceColorHex(aggregateStats.averagePerformance)
-                                          }}
-                                />
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="p-4 pb-0">
-                                <CardTitle className="text-sm font-medium">Всего тестов</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4">
-                                <div className="text-2xl font-bold">
-                                    {aggregateStats.totalTests}
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="p-4 pb-0">
-                                <CardTitle className="text-sm font-medium">Изученных предметов</CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4">
-                                <div className="text-2xl font-bold">
-                                    {Object.keys(statistics).length}
-                                </div>
-                            </CardContent>
-                        </Card>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 flex items-center shadow-md">
+                        <div className="bg-white/20 rounded-full p-3 mr-4">
+                            <Award size={24} className="text-white" />
+                        </div>
+                        <div>
+                            <p className="text-white/70 text-sm">Средний результат</p>
+                            <p className="text-2xl font-bold">{aggregateStats.averagePerformance.toFixed(1)}%</p>
+                        </div>
                     </div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Сравнение результатов по предметам</CardTitle>
-                            <CardDescription>
-                                Визуализация вашей успеваемости по всем предметам
-                            </CardDescription>
-                            <div className="flex mt-2 space-x-2">
-                                <button
-                                    onClick={() => setChartType('bar')}
-                                    className={`px-3 py-1 text-sm rounded ${chartType === 'bar' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-                                >
-                                    Столбцы
-                                </button>
-                                <button
-                                    onClick={() => setChartType('radar')}
-                                    className={`px-3 py-1 text-sm rounded ${chartType === 'radar' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-                                >
-                                    Радар
-                                </button>
-                                <button
-                                    onClick={() => setChartType('pie')}
-                                    className={`px-3 py-1 text-sm rounded ${chartType === 'pie' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-                                >
-                                    Круговая
-                                </button>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            {overviewChartData.length > 0 ? (
-                                <div className="h-80 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        {chartType === 'bar' && (
-                                            <BarChart
-                                                data={overviewChartData}
-                                                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                                            >
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
-                                                <YAxis domain={[0, 100]} />
-                                                <Tooltip content={<CustomTooltip />} />
-                                                <Legend />
-                                                <Bar dataKey="Результат" fill="#8884d8" />
-                                            </BarChart>
-                                        )}
-                                        {chartType === 'radar' && (
-                                            <RadarChart outerRadius={90} width={500} height={250} data={overviewChartData}>
-                                                <PolarGrid />
-                                                <PolarAngleAxis dataKey="name" />
-                                                <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                                                <Radar name="Результат" dataKey="Результат" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                                                <Legend />
-                                                <Tooltip content={<CustomTooltip />} />
-                                            </RadarChart>
-                                        )}
-                                        {chartType === 'pie' && (
-                                            <PieChart width={400} height={300}>
-                                                <Pie
-                                                    data={overviewChartData}
-                                                    dataKey="Результат"
-                                                    nameKey="name"
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    outerRadius={80}
-                                                    label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                                >
-                                                    {overviewChartData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip content={<CustomTooltip />} />
-                                                <Legend />
-                                            </PieChart>
-                                        )}
-                                    </ResponsiveContainer>
-                                </div>
-                            ) : (
-                                <div className="text-center py-8">
-                                    Нет данных о выполненных тестах
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 flex items-center shadow-md">
+                        <div className="bg-white/20 rounded-full p-3 mr-4">
+                            <CheckCircle size={24} className="text-white" />
+                        </div>
+                        <div>
+                            <p className="text-white/70 text-sm">Всего тестов</p>
+                            <p className="text-2xl font-bold">{aggregateStats.totalTests}</p>
+                        </div>
+                    </div>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Детальная информация</CardTitle>
+                    <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 flex items-center shadow-md">
+                        <div className="bg-white/20 rounded-full p-3 mr-4">
+                            <Book size={24} className="text-white" />
+                        </div>
+                        <div>
+                            <p className="text-white/70 text-sm">Изученных предметов</p>
+                            <p className="text-2xl font-bold">{Object.keys(statistics).length}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <Tabs defaultValue="performance" className="w-full mb-6">
+                <TabsList className="grid w-full grid-cols-2 mb-8 p-1 bg-gray-100 rounded-lg">
+                    <TabsTrigger value="performance" className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-md py-3">
+                        <TrendingUp className="mr-2" size={18} />
+                        Общая статистика
+                    </TabsTrigger>
+                    <TabsTrigger value="bySubject" className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-md py-3">
+                        <Book className="mr-2" size={18} />
+                        По предметам
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="performance" className="space-y-6">
+                    <Card className="shadow-lg overflow-hidden border-0">
+                        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                            <CardTitle className="flex items-center text-xl">
+                                <TrendingUp className="mr-2 text-blue-600" size={20} />
+                                Детальная информация
+                            </CardTitle>
                             <CardDescription>
                                 Ваши индивидуальные показатели по каждому предмету
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <CardContent className="p-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {Object.keys(statistics).length > 0 ? (
                                     Object.entries(statistics).map(([subjectName, data]) => (
-                                        <Card key={data.subjectId} className="overflow-hidden border-t-4" style={{ borderTopColor: getPerformanceColorHex(data.averagePercentage) }}>
+                                        <Card key={data.subjectId} className="overflow-hidden border-0 shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+                                            <div className="h-2" style={{ backgroundColor: getPerformanceColorHex(data.averagePercentage) }}></div>
                                             <CardHeader className="p-4 pb-2">
-                                                <CardTitle className="text-base">{subjectName}</CardTitle>
+                                                <div className="flex justify-between items-center">
+                                                    <CardTitle className="text-base">{subjectName}</CardTitle>
+                                                    {data.averagePercentage >= 0 && (
+                                                        <Badge className="ml-2" style={{ backgroundColor: getPerformanceColorHex(data.averagePercentage) }}>
+                                                            {getPerformanceText(data.averagePercentage)}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <CardDescription className="mt-1">{data.gradeName || 'Класс не указан'}</CardDescription>
                                             </CardHeader>
-                                            <CardContent className="p-4 pt-0">
-                                                <div className="space-y-2">
-                                                    <div className="flex justify-between text-sm">
-                                                        <span>Средний результат:</span>
-                                                        <span className={getPerformanceColor(data.averagePercentage)}>
-                                                            {data.averagePercentage ? data.averagePercentage.toFixed(1) : '0.0'}%
+                                            <CardContent className="p-4 pt-2">
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <div className="flex justify-between text-sm mb-1">
+                                                            <span className="font-medium">Средний результат:</span>
+                                                            <span className={`font-bold ${getPerformanceColor(data.averagePercentage)}`}>
+                                                                {data.averagePercentage ? data.averagePercentage.toFixed(1) : '0.0'}%
+                                                            </span>
+                                                        </div>
+                                                        <Progress
+                                                            value={data.averagePercentage || 0}
+                                                            className="h-2.5 rounded-full"
+                                                            style={{
+                                                                background: 'rgba(0,0,0,0.05)',
+                                                                ['--progress-background']: getPerformanceColorHex(data.averagePercentage || 0)
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className="flex justify-between items-center text-sm">
+                                                        <span className="flex items-center">
+                                                            <CheckCircle size={16} className="mr-1.5 text-gray-500" />
+                                                            Выполнено тестов:
                                                         </span>
-                                                    </div>
-                                                    <Progress
-                                                        value={data.averagePercentage || 0}
-                                                        className="h-2"
-                                                        style={{
-                                                            background: 'rgba(0,0,0,0.1)',
-                                                            ['--progress-background']: getPerformanceColorHex(data.averagePercentage || 0)
-                                                        }}
-                                                    />
-                                                    <div className="flex justify-between text-sm">
-                                                        <span>Выполнено тестов:</span>
-                                                        <span>{data.completedTests || 0}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-sm">
-                                                        <span>Класс:</span>
-                                                        <span>{data.gradeName || 'Н/Д'}</span>
+                                                        <span className="font-bold">{data.completedTests || 0}</span>
                                                     </div>
                                                 </div>
                                             </CardContent>
+
                                         </Card>
                                     ))
                                 ) : (
-                                    <div className="col-span-3 text-center py-8">
-                                        Нет данных о выполненных тестах
+                                    <div className="col-span-3 text-center py-12 bg-gray-50 rounded-xl shadow-inner">
+                                        <div className="text-gray-400 text-lg">Нет данных о выполненных тестах</div>
+                                        <div className="text-gray-500 text-sm mt-2">Пройдите тесты, чтобы увидеть свою статистику</div>
                                     </div>
                                 )}
                             </div>
@@ -422,20 +298,23 @@ const StatisticsPage = () => {
                 </TabsContent>
 
                 <TabsContent value="bySubject">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Статистика по предмету</CardTitle>
+                    <Card className="shadow-lg overflow-hidden border-0">
+                        <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                            <CardTitle className="flex items-center text-xl">
+                                <Book className="mr-2 text-blue-600" size={20} />
+                                Статистика по предмету
+                            </CardTitle>
                             <CardDescription>
                                 Выберите предмет для просмотра детальной статистики
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <div className="mb-4">
+                        <CardContent className="p-6">
+                            <div className="mb-6">
                                 <Select
                                     value={selectedSubject ? selectedSubject.toString() : ''}
                                     onValueChange={handleSubjectChange}
                                 >
-                                    <SelectTrigger className="w-full md:w-1/3">
+                                    <SelectTrigger className="w-full md:w-1/3 border-blue-200 focus:ring-blue-400">
                                         <SelectValue placeholder="Выберите предмет" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -449,138 +328,173 @@ const StatisticsPage = () => {
                             </div>
 
                             {selectedSubjectData ? (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <Card className="border-t-4" style={{ borderTopColor: getPerformanceColorHex(selectedSubjectData.averagePercentage || 0) }}>
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <Card className="border-0 shadow-md overflow-hidden">
+                                            <div className="h-2" style={{ backgroundColor: getPerformanceColorHex(selectedSubjectData.averagePercentage || 0) }}></div>
                                             <CardHeader className="p-4 pb-0">
-                                                <CardTitle className="text-sm font-medium">Средний результат</CardTitle>
+                                                <CardTitle className="text-sm font-medium flex items-center">
+                                                    <Award size={18} className="mr-2 text-blue-600" />
+                                                    Средний результат
+                                                </CardTitle>
                                             </CardHeader>
                                             <CardContent className="p-4">
-                                                <div className="text-2xl font-bold">
+                                                <div className="text-3xl font-bold">
                                                     <span className={getPerformanceColor(selectedSubjectData.averagePercentage || 0)}>
                                                         {selectedSubjectData.averagePercentage ? selectedSubjectData.averagePercentage.toFixed(1) : '0.0'}%
                                                     </span>
                                                 </div>
+                                                <div className="mt-2">
+                                                    <Badge className="font-normal" style={{ backgroundColor: getPerformanceColorHex(selectedSubjectData.averagePercentage || 0) }}>
+                                                        {getPerformanceText(selectedSubjectData.averagePercentage || 0)}
+                                                    </Badge>
+                                                </div>
                                                 <Progress
                                                     value={selectedSubjectData.averagePercentage || 0}
-                                                    className="h-2 mt-2"
+                                                    className="h-2.5 mt-4 rounded-full"
                                                     style={{
-                                                        background: 'rgba(0,0,0,0.1)',
+                                                        background: 'rgba(0,0,0,0.05)',
                                                         ['--progress-background']: getPerformanceColorHex(selectedSubjectData.averagePercentage || 0)
                                                     }}
                                                 />
                                             </CardContent>
                                         </Card>
-                                        <Card>
+                                        <Card className="border-0 shadow-md overflow-hidden">
+                                            <div className="h-2 bg-blue-500"></div>
                                             <CardHeader className="p-4 pb-0">
-                                                <CardTitle className="text-sm font-medium">Выполнено тестов</CardTitle>
+                                                <CardTitle className="text-sm font-medium flex items-center">
+                                                    <CheckCircle size={18} className="mr-2 text-blue-600" />
+                                                    Выполнено тестов
+                                                </CardTitle>
                                             </CardHeader>
                                             <CardContent className="p-4">
-                                                <div className="text-2xl font-bold">
+                                                <div className="text-3xl font-bold">
                                                     {selectedSubjectData.completedTests || 0}
                                                 </div>
+                                                <div className="text-sm text-gray-500 mt-2">
+                                                    {selectedSubjectData.completedTests > 0 ? 'Хороший прогресс!' : 'Пока нет выполненных тестов'}
+                                                </div>
+                                                {selectedSubjectData.completedTests > 0 && (
+                                                    <Progress
+                                                        value={100}
+                                                        className="h-2.5 mt-4 rounded-full"
+                                                        style={{
+                                                            background: 'rgba(0,0,0,0.05)',
+                                                            ['--progress-background']: '#3B82F6'
+                                                        }}
+                                                    />
+                                                )}
                                             </CardContent>
                                         </Card>
-                                        <Card>
+                                        <Card className="border-0 shadow-md overflow-hidden">
+                                            <div className="h-2 bg-indigo-500"></div>
                                             <CardHeader className="p-4 pb-0">
-                                                <CardTitle className="text-sm font-medium">Класс</CardTitle>
+                                                <CardTitle className="text-sm font-medium flex items-center">
+                                                    <Book size={18} className="mr-2 text-blue-600" />
+                                                    Класс
+                                                </CardTitle>
                                             </CardHeader>
                                             <CardContent className="p-4">
-                                                <div className="text-2xl font-bold">
+                                                <div className="text-3xl font-bold">
                                                     {selectedSubjectData.gradeName || 'Н/Д'}
                                                 </div>
+                                                <div className="text-sm text-gray-500 mt-2">
+                                                    {selectedSubjectData.gradeName ? `Программа для ${selectedSubjectData.gradeName} класса` : 'Класс не определен'}
+                                                </div>
+                                                {selectedSubjectData.gradeName && (
+                                                    <Progress
+                                                        value={100}
+                                                        className="h-2.5 mt-4 rounded-full"
+                                                        style={{
+                                                            background: 'rgba(0,0,0,0.05)',
+                                                            ['--progress-background']: '#6366F1'
+                                                        }}
+                                                    />
+                                                )}
                                             </CardContent>
                                         </Card>
                                     </div>
 
                                     {selectedSubjectData.testStats && selectedSubjectData.testStats.length > 0 ? (
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Динамика успеваемости</CardTitle>
+                                        <Card className="border-0 shadow-lg overflow-hidden">
+                                            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                                                <CardTitle className="flex items-center text-xl">
+                                                    <BarChart2 className="mr-2 text-blue-600" size={20} />
+                                                    Результаты тестов
+                                                </CardTitle>
                                                 <CardDescription>
-                                                    Результаты по последним тестам
+                                                    Детальные результаты по каждому тесту
                                                 </CardDescription>
                                                 <div className="flex mt-2 space-x-2">
                                                     <button
-                                                        onClick={() => setPerformanceView('chart')}
-                                                        className={`px-3 py-1 text-sm rounded ${performanceView === 'chart' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-                                                    >
-                                                        График
-                                                    </button>
-                                                    <button
                                                         onClick={() => setPerformanceView('table')}
-                                                        className={`px-3 py-1 text-sm rounded ${performanceView === 'table' ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+                                                        className={`px-3 py-1.5 text-sm rounded-md transition-all duration-300 ${performanceView === 'table' ? 'bg-blue-500 text-white shadow-md' : 'bg-white border border-gray-200 hover:bg-gray-50'}`}
                                                     >
                                                         Таблица
                                                     </button>
                                                 </div>
                                             </CardHeader>
-                                            <CardContent>
-                                                {performanceView === 'chart' ? (
-                                                    <div className="h-80 w-full">
-                                                        <ResponsiveContainer width="100%" height="100%">
-                                                            <AreaChart
-                                                                data={subjectTestsData}
-                                                                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                                                            >
-                                                                <CartesianGrid strokeDasharray="3 3" />
-                                                                <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
-                                                                <YAxis domain={[0, 100]} />
-                                                                <Tooltip content={<CustomTooltip />} />
-                                                                <Legend />
-                                                                <Area type="monotone" dataKey="Результат" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
-                                                                <Area type="monotone" dataKey="Баллы" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
-                                                            </AreaChart>
-                                                        </ResponsiveContainer>
-                                                    </div>
-                                                ) : (
+                                            <CardContent className="p-0">
+                                                <div className="overflow-x-auto">
                                                     <Table>
                                                         <TableCaption>Результаты тестов по предмету "{subjects.find(s => s.id === selectedSubject)?.name || ''}"</TableCaption>
                                                         <TableHeader>
-                                                            <TableRow>
-                                                                <TableHead>Тест</TableHead>
-                                                                <TableHead className="text-right">Баллы</TableHead>
-                                                                <TableHead className="text-right">Результат</TableHead>
-                                                                <TableHead className="text-right">Дата</TableHead>
-                                                                <TableHead className="text-right">Попытка</TableHead>
+                                                            <TableRow className="bg-gray-50">
+                                                                <TableHead className="font-semibold">Тест</TableHead>
+                                                                <TableHead className="text-right font-semibold">Баллы</TableHead>
+                                                                <TableHead className="text-right font-semibold">Результат</TableHead>
+                                                                <TableHead className="text-right font-semibold">Дата</TableHead>
+                                                                <TableHead className="text-right font-semibold">Попытка</TableHead>
                                                             </TableRow>
                                                         </TableHeader>
                                                         <TableBody>
                                                             {selectedSubjectData.testStats.map((test, index) => (
-                                                                <TableRow key={`${test.testId}-${index}`}>
+                                                                <TableRow key={`${test.testId}-${index}`} className="hover:bg-blue-50/30 transition-colors">
                                                                     <TableCell className="font-medium">{test.testTitle}</TableCell>
                                                                     <TableCell className="text-right">{test.score || 0} / {test.maxScore || 0}</TableCell>
                                                                     <TableCell className="text-right">
-                                                                        <Badge className={
-                                                                            (test.percentage || 0) >= 90 ? "bg-green-500" :
-                                                                                (test.percentage || 0) >= 75 ? "bg-emerald-500" :
-                                                                                    (test.percentage || 0) >= 60 ? "bg-amber-500" :
-                                                                                        "bg-red-500"
-                                                                        }>
+                                                                        <Badge className={`font-normal transition-all duration-300 ${
+                                                                            (test.percentage || 0) >= 90 ? "bg-green-500 hover:bg-green-600" :
+                                                                                (test.percentage || 0) >= 75 ? "bg-blue-500 hover:bg-blue-600" :
+                                                                                    (test.percentage || 0) >= 60 ? "bg-amber-500 hover:bg-amber-600" :
+                                                                                        "bg-red-500 hover:bg-red-600"
+                                                                        }`}>
                                                                             {test.percentage ? test.percentage.toFixed(1) : '0.0'}%
                                                                         </Badge>
                                                                     </TableCell>
                                                                     <TableCell className="text-right">{formatDate(test.completedAt)}</TableCell>
-                                                                    <TableCell className="text-right">{test.attemptNumber || 1}</TableCell>
+                                                                    <TableCell className="text-right">
+                                                                        <Badge variant="outline" className="bg-gray-100">
+                                                                            #{test.attemptNumber || 1}
+                                                                        </Badge>
+                                                                    </TableCell>
                                                                 </TableRow>
                                                             ))}
                                                         </TableBody>
                                                     </Table>
-                                                )}
+                                                </div>
                                             </CardContent>
                                         </Card>
                                     ) : (
-                                        <div className="text-center py-8 bg-gray-50 rounded-lg">
-                                            Нет данных о выполненных тестах по этому предмету
+                                        <div className="text-center py-12 bg-gray-50 rounded-xl shadow-inner">
+                                            <div className="text-gray-400 text-lg">Нет данных о выполненных тестах по этому предмету</div>
+                                            <div className="text-gray-500 text-sm mt-2">Пройдите тесты, чтобы увидеть свою статистику</div>
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <div className="text-center py-8">
-                                    {subjects.length > 0 ?
-                                        "Выберите предмет для просмотра статистики" :
-                                        "Нет данных о выполненных тестах"
-                                    }
+                                <div className="text-center py-12 bg-gray-50 rounded-xl shadow-inner">
+                                    {subjects.length > 0 ? (
+                                        <div>
+                                            <div className="text-gray-400 text-lg">Выберите предмет для просмотра статистики</div>
+                                            <div className="text-gray-500 text-sm mt-2">Используйте выпадающий список выше</div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <div className="text-gray-400 text-lg">Нет данных о выполненных тестах</div>
+                                            <div className="text-gray-500 text-sm mt-2">Пройдите тесты, чтобы увидеть свою статистику</div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </CardContent>

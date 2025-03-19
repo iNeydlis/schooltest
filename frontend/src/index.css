@@ -1,5 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 @import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @plugin 'tailwindcss-animate';
 
@@ -26,41 +29,50 @@ body {
 button {
   cursor: pointer;
   padding: 0.5rem 1rem;
-  background-color: #4a6baf;
+  background-color: #3B82F6; /* Updated to match blue-500 from component */
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 0.5rem; /* Updated to match rounded-lg from component */
   font-size: 1rem;
-  transition: background-color 0.3s;
+  transition: background-color 0.3s, transform 0.3s, box-shadow 0.3s;
 }
 
 button:hover {
-  background-color: #3a5999;
+  background-color: #2563EB; /* Updated to blue-600 */
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 button.secondary {
-  background-color: #6c757d;
+  background-color: #6B7280; /* Updated to match gray-500 */
 }
 
 button.secondary:hover {
-  background-color: #5a6268;
+  background-color: #4B5563; /* Updated to gray-600 */
 }
 
 button.danger {
-  background-color: #dc3545;
+  background-color: #EF4444; /* Updated to red-500 */
 }
 
 button.danger:hover {
-  background-color: #c82333;
+  background-color: #DC2626; /* Updated to red-600 */
 }
 
 input, select {
   padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid #E5E7EB; /* Updated to gray-200 */
+  border-radius: 0.5rem;
   font-size: 1rem;
   width: 100%;
   margin-bottom: 1rem;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: #93C5FD; /* Updated to match blue-200 */
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); /* Blue-500 with opacity */
 }
 
 .form-group {
@@ -70,24 +82,129 @@ input, select {
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;
+  font-weight: 500;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 1rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
 }
 
 table th, table td {
   padding: 0.75rem;
   text-align: left;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #E5E7EB; /* Updated to gray-200 */
 }
 
 table th {
-  background-color: #f2f2f2;
+  background-color: #F9FAFB; /* Updated to gray-50 */
+  font-weight: 600;
 }
 
+table tr:hover {
+  background-color: #EFF6FF; /* Added blue-50 background on hover */
+}
+
+/* Card styles to match your React components */
+.card {
+  background-color: white;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  border: none;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.card-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.card-content {
+  padding: 1.5rem;
+}
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827; /* Updated to gray-900 */
+}
+
+.card-description {
+  color: #6B7280; /* Updated to gray-500 */
+  margin-top: 0.25rem;
+}
+
+/* Badge styles */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1;
+  color: white;
+  white-space: nowrap;
+}
+
+/* Progress bar styles */
+.progress {
+  width: 100%;
+  height: 0.625rem;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-value {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+/* Tab styles */
+.tabs {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.tabs-list {
+  display: flex;
+  background-color: #F3F4F6; /* Updated to gray-100 */
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.tabs-trigger {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tabs-trigger[data-state="active"] {
+  background-color: white;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* Color Variables - Updated to match your component */
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -108,10 +225,10 @@ table th {
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-1: oklch(0.646 0.222 41.116); /* Green - excellent */
+  --chart-2: oklch(0.6 0.118 184.704); /* Blue - good */
+  --chart-3: oklch(0.398 0.07 227.392); /* Amber - average */
+  --chart-4: oklch(0.828 0.189 84.429); /* Red - poor */
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
@@ -122,6 +239,16 @@ table th {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Add these new color variables to match your React component */
+  --color-excellent: #10B981; /* Green */
+  --color-good: #3B82F6;      /* Blue */
+  --color-average: #F59E0B;   /* Amber/Orange */
+  --color-poor: #EF4444;      /* Red */
+
+  /* Gradient backgrounds */
+  --gradient-blue: linear-gradient(to right, #3B82F6, #4F46E5);
+  --gradient-blue-light: linear-gradient(to right, #EFF6FF, #EEF2FF);
 }
 
 .dark {
@@ -157,6 +284,58 @@ table th {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+
+  /* Dark mode adjustments for component specific colors */
+  --color-excellent: #059669; /* Darker green */
+  --color-good: #2563EB;      /* Darker blue */
+  --color-average: #D97706;   /* Darker amber */
+  --color-poor: #DC2626;      /* Darker red */
+
+  /* Dark mode gradient backgrounds */
+  --gradient-blue: linear-gradient(to right, #1D4ED8, #4338CA);
+  --gradient-blue-light: linear-gradient(to right, #1E3A8A20, #3730A320);
+}
+
+/* Additional utility classes for your component */
+.bg-gradient-blue {
+  background: var(--gradient-blue);
+}
+
+.bg-gradient-blue-light {
+  background: var(--gradient-blue-light);
+}
+
+/* Skeleton loading styles */
+.skeleton {
+  background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%);
+  background-size: 200% 100%;
+  animation: 1.5s shine linear infinite;
+  border-radius: 0.5rem;
+}
+
+@keyframes shine {
+  to {
+    background-position-x: -200%;
+  }
+}
+
+/* Add specific styles for the Lucide icons */
+.lucide {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* Additional shadows */
+.shadow-inner {
+  box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+}
+
+.shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 @theme inline {
@@ -205,4 +384,23 @@ table th {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Additional styles for Statistics page-specific components */
+.bg-white\/10 {
+  background-color: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+.bg-white\/20 {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Progress component custom styling */
+.progress {
+  --progress-background: var(--color-good);
+}
+
+.progress-value {
+  background-color: var(--progress-background);
 }
