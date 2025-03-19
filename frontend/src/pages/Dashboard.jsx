@@ -75,9 +75,7 @@ const UserInfo = ({ user }) => {
                 {user.role === 'STUDENT' && (
                     <>
                         <div><strong>Класс:</strong></div>
-                        <div>{user.grade}</div>
-                        <div><strong>Группа:</strong></div>
-                        <div>{user.group || 'Не указана'}</div>
+                        <div>{user.gradeName}</div>
                     </>
                 )}
             </div>
