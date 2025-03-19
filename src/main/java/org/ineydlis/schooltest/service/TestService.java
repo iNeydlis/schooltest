@@ -144,6 +144,7 @@ public class TestService {
     }
 
     public List<TestDto> getTestsForStudent(Long studentId) {
+        // Начало метода без изменений
         User student = userRepository.findById(studentId)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
 
@@ -180,7 +181,8 @@ public class TestService {
                 // Установим лучший результат
                 testDto.setBestScore(bestAttempt.getScore());
 
-                // Установим реальный максимальный балл из этой попытки
+                // ВАЖНОЕ ИЗМЕНЕНИЕ: Используем реальный максимальный балл из этой попытки,
+                // который теперь основан только на отобранных вопросах
                 testDto.setMaxScore(bestAttempt.getMaxScore());
 
                 // Добавим процентное значение для корректного отображения
@@ -190,7 +192,8 @@ public class TestService {
                     testDto.setBestScorePercentage(0.0);
                 }
             } else {
-                // Если попыток еще не было, устанавливаем максимальный балл из всех вопросов
+                // Если попыток еще не было, показываем максимальный балл для всех вопросов,
+                // но с примечанием, что реальный балл может быть другим при случайном выборе
                 testDto.setMaxScore(testDto.getTotalPoints());
             }
 
@@ -497,9 +500,10 @@ public class TestService {
         testResult.setStartedAt(LocalDateTime.now());
         testResult.setCompleted(false);
         testResult.setAttemptNumber(attemptNumber);
-        testResult.setMaxScore(test.getQuestions().stream()
-                .mapToInt(Question::getPoints)
-                .sum());
+
+        // НЕ устанавливаем maxScore тут, а сделаем это после выбора вопросов
+        // Изначальное значение будем ставить только для сохранения структуры
+        testResult.setMaxScore(0);
 
         TestResult savedResult = testResultRepository.save(testResult);
         return TestResultDto.fromEntity(savedResult);
@@ -528,6 +532,13 @@ public class TestService {
 
         // If questionsToShow is null or less than or equal to 0, or greater than total questions, show all questions
         if (test.getQuestionsToShow() == null || test.getQuestionsToShow() <= 0 || test.getQuestionsToShow() >= allQuestions.size()) {
+            // Если отображаются все вопросы, устанавливаем maxScore как сумму баллов всех вопросов
+            int totalMaxScore = allQuestions.stream()
+                    .mapToInt(Question::getPoints)
+                    .sum();
+            testResult.setMaxScore(totalMaxScore);
+            testResultRepository.save(testResult);
+
             return allQuestions.stream()
                     .map(q -> QuestionDto.fromEntity(q, false))
                     .collect(Collectors.toList());
@@ -547,7 +558,13 @@ public class TestService {
                     .map(Question::getId)
                     .collect(Collectors.toList());
 
+            // ВАЖНО: Вычисляем maxScore на основе выбранных вопросов
+            int selectedQuestionsMaxScore = selectedQuestions.stream()
+                    .mapToInt(Question::getPoints)
+                    .sum();
+
             testResult.setSelectedQuestionIds(selectedQuestionIds);
+            testResult.setMaxScore(selectedQuestionsMaxScore); // Устанавливаем правильный maxScore
             testResultRepository.save(testResult);
 
             return selectedQuestions.stream()
@@ -566,6 +583,18 @@ public class TestService {
                     .map(questionMap::get)
                     .filter(Objects::nonNull) // Filter out any questions that might have been deleted
                     .collect(Collectors.toList());
+
+            // ВАЖНО: Проверяем, что maxScore соответствует выбранным вопросам
+            // Это может быть полезно, если вопросы были изменены между запусками теста
+            int selectedQuestionsMaxScore = selectedQuestions.stream()
+                    .mapToInt(Question::getPoints)
+                    .sum();
+
+            // Обновляем maxScore, если он не соответствует выбранным вопросам
+            if (testResult.getMaxScore() != selectedQuestionsMaxScore) {
+                testResult.setMaxScore(selectedQuestionsMaxScore);
+                testResultRepository.save(testResult);
+            }
 
             return selectedQuestions.stream()
                     .map(q -> QuestionDto.fromEntity(q, false))
@@ -600,7 +629,6 @@ public class TestService {
 
         // Process student answers
         int totalScore = 0;
-        int maxPossibleScore = 0;
 
         // Create a map of questionId -> Question for faster access
         Map<Long, Question> questionMap = test.getQuestions().stream()
@@ -617,16 +645,9 @@ public class TestService {
                     .collect(Collectors.toList());
         }
 
-        // Calculate the maximum possible score based on the selected questions only
-        for (Long questionId : questionIdsToConsider) {
-            Question question = questionMap.get(questionId);
-            if (question != null) {
-                maxPossibleScore += question.getPoints();
-            }
-        }
-
-        // Set the maxScore correctly in the test result
-        testResult.setMaxScore(maxPossibleScore);
+        // ВНИМАНИЕ: maxPossibleScore уже установлен в testResult.getMaxScore()
+        // при выборе вопросов, поэтому мы можем его использовать напрямую
+        int maxPossibleScore = testResult.getMaxScore();
 
         // Process each answer
         for (StudentAnswerRequest answerRequest : request.getAnswers()) {
@@ -764,7 +785,6 @@ public class TestService {
         if (timeExpired) {
             resultDto.setMessage("Время выполнения теста истекло. Учтены только предоставленные ответы.");
         }
-
 
         return resultDto;
     }
