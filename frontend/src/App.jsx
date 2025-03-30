@@ -12,7 +12,10 @@ import TestResultsList from './pages/TestResultsList';
 import Header from './components/Header';
 import Loading from './components/Loading';
 import TestResultDetails from "./pages/TestResultDetails.jsx";
-import StatisticsPage from "./pages/StatisticsPage.jsx";
+import StatisticsPage from "./pages/StudentStatisticsPage.jsx";
+import StudentStatisticsPage from "./pages/StudentStatisticsPage.jsx";
+import StatisticsRouter from "@/pages/StatisticsRouter.jsx";
+import TeacherAdminStatisticsPage from "@/pages/TeacherAdminStatisticsPage.jsx";
 
 const App = () => {
     const { user, loading } = useContext(AuthContext);
@@ -50,15 +53,6 @@ const App = () => {
                             element={
                                 user && (user.role === 'TEACHER' || user.role === 'ADMIN') ?
                                     <TestForm /> : <Navigate to="/tests" />
-                            }
-                        />
-                        <Route
-                            path="/statistics"
-                            element={
-                                user && (user.role === 'TEACHER' || user.role === 'ADMIN'
-                                || user.role === 'STUDENT'
-                                ) ?
-                                    <StatisticsPage /> : <Navigate to="/tests" />
                             }
                         />
                         {/* Редактирование теста: только для учителей и админов */}
@@ -112,7 +106,30 @@ const App = () => {
                                     <TestResultsList /> : <Navigate to="/tests" />
                             }
                         />
+                        {/* Статистика: основной маршрут для выбора раздела статистики */}
+                        <Route
+                            path="/statistics"
+                            element={
+                                user ? <StatisticsRouter /> : <Navigate to="/login" />
+                            }
+                        />
 
+                        {/* Статистика ученика: только для студентов */}
+                        <Route
+                            path="/student-statistics"
+                            element={
+                                user && user.role === 'STUDENT' ?
+                                    <StudentStatisticsPage /> : <Navigate to="/statistics" />
+                            }
+                        />
+                        {/* Статистика для учителей и администраторов */}
+                        <Route
+                            path="/teacher-admin-statistics"
+                            element={
+                                user && (user.role === 'TEACHER' || user.role === 'ADMIN') ?
+                                    <TeacherAdminStatisticsPage /> : <Navigate to="/statistics" />
+                            }
+                        />
                         {/* Главная страница: для всех авторизованных */}
                         <Route
                             path="/"
