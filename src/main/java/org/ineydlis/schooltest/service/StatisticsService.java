@@ -196,14 +196,17 @@ public class StatisticsService {
         List<UserStatDto> studentStats = new ArrayList<>();
 
         resultsByStudent.forEach((studentId, results) -> {
-            // Фильтруем результаты, чтобы включать только те, где score не null
+            // Filter only completed attempts with valid scores
             List<TestResult> validResults = results.stream()
-                    .filter(r -> r.getScore() != null)
+                    .filter(r -> r.isCompleted())
+                    .filter(r -> r.getScore() != null && r.getMaxScore() != null && r.getMaxScore() > 0)
                     .collect(Collectors.toList());
 
             if (!validResults.isEmpty()) {
+                // Find best attempt based on percentage score rather than raw score
                 TestResult bestAttempt = validResults.stream()
-                        .max(Comparator.comparing(TestResult::getScore))
+                        .max(Comparator.comparingDouble(r ->
+                                (double) r.getScore() / r.getMaxScore()))
                         .orElse(null);
 
                 if (bestAttempt != null) {
@@ -218,13 +221,17 @@ public class StatisticsService {
                     statDto.setCompletedAt(bestAttempt.getCompletedAt());
                     statDto.setAttemptNumber(bestAttempt.getAttemptNumber());
 
+                    // Calculate percentage based on actual questions shown
+                    double percentage = (double) bestAttempt.getScore() / bestAttempt.getMaxScore() * 100;
+                    statDto.setAveragePercentage(Math.round(percentage * 100) / 100.0);
+
                     studentStats.add(statDto);
                 }
             }
         });
 
-        // Sort by score (descending)
-        studentStats.sort(Comparator.comparingInt(UserStatDto::getScore).reversed());
+        // Sort by percentage (descending) instead of raw score
+        studentStats.sort(Comparator.comparingDouble(UserStatDto::getAveragePercentage).reversed());
 
         StatisticViewDto viewDto = new StatisticViewDto();
         viewDto.setTestId(test.getId());
@@ -237,6 +244,7 @@ public class StatisticsService {
 
         return viewDto;
     }
+
 
     /**
      * Get statistics for a specific grade (all students' best test attempts)
@@ -266,14 +274,17 @@ public class StatisticsService {
             int completedTests = 0;
 
             for (List<TestResult> testResults : resultsByTest.values()) {
-                // Отфильтровываем результаты с null значениями score
+                // Filter only completed attempts with valid scores
                 List<TestResult> validResults = testResults.stream()
-                        .filter(r -> r.getScore() != null)
+                        .filter(r -> r.isCompleted())
+                        .filter(r -> r.getScore() != null && r.getMaxScore() != null && r.getMaxScore() > 0)
                         .collect(Collectors.toList());
 
                 if (!validResults.isEmpty()) {
+                    // Find best attempt based on percentage score rather than raw score
                     TestResult bestAttempt = validResults.stream()
-                            .max(Comparator.comparingInt(TestResult::getScore))
+                            .max(Comparator.comparingDouble(r ->
+                                    (double) r.getScore() / r.getMaxScore()))
                             .orElse(null);
 
                     if (bestAttempt != null) {
@@ -293,8 +304,11 @@ public class StatisticsService {
                 statDto.setScore(totalScore);
                 statDto.setMaxScore(totalMaxScore);
                 statDto.setCompletedTests(completedTests);
-                statDto.setAveragePercentage(totalMaxScore > 0 ?
-                        (double) totalScore / totalMaxScore * 100 : 0);
+
+                // Calculate percentage based on actual questions shown
+                double averagePercentage = totalMaxScore > 0 ?
+                        (double) totalScore / totalMaxScore * 100 : 0;
+                statDto.setAveragePercentage(Math.round(averagePercentage * 100) / 100.0);
 
                 studentStats.add(statDto);
             }
@@ -312,6 +326,7 @@ public class StatisticsService {
 
         return viewDto;
     }
+
 
     /**
      * Get statistics for a specific subject (all students' best test attempts)
@@ -351,14 +366,17 @@ public class StatisticsService {
             int completedTests = 0;
 
             for (List<TestResult> testResults : resultsByTest.values()) {
-                // Фильтруем результаты, чтобы исключить те, где score равен null
+                // Filter only completed attempts with valid scores
                 List<TestResult> validResults = testResults.stream()
-                        .filter(r -> r.getScore() != null)
+                        .filter(r -> r.isCompleted())
+                        .filter(r -> r.getScore() != null && r.getMaxScore() != null && r.getMaxScore() > 0)
                         .collect(Collectors.toList());
 
                 if (!validResults.isEmpty()) {
+                    // Find best attempt based on percentage score rather than raw score
                     TestResult bestAttempt = validResults.stream()
-                            .max(Comparator.comparingInt(TestResult::getScore))
+                            .max(Comparator.comparingDouble(r ->
+                                    (double) r.getScore() / r.getMaxScore()))
                             .orElse(null);
 
                     if (bestAttempt != null) {
@@ -381,8 +399,11 @@ public class StatisticsService {
                 statDto.setScore(totalScore);
                 statDto.setMaxScore(totalMaxScore);
                 statDto.setCompletedTests(completedTests);
-                statDto.setAveragePercentage(totalMaxScore > 0 ?
-                        (double) totalScore / totalMaxScore * 100 : 0);
+
+                // Calculate percentage based on actual questions shown
+                double averagePercentage = totalMaxScore > 0 ?
+                        (double) totalScore / totalMaxScore * 100 : 0;
+                statDto.setAveragePercentage(Math.round(averagePercentage * 100) / 100.0);
 
                 studentStats.add(statDto);
             }
@@ -423,14 +444,17 @@ public class StatisticsService {
         for (Test test : tests) {
             List<TestResult> results = testResultRepository.findByStudentIdAndTestId(studentId, test.getId());
 
-            // Фильтруем результаты, чтобы исключить те, где score равен null
+            // Filter only completed attempts with valid scores
             List<TestResult> validResults = results.stream()
-                    .filter(r -> r.getScore() != null)
+                    .filter(r -> r.isCompleted())
+                    .filter(r -> r.getScore() != null && r.getMaxScore() != null && r.getMaxScore() > 0)
                     .collect(Collectors.toList());
 
             if (!validResults.isEmpty()) {
+                // Find best attempt based on percentage score rather than raw score
                 TestResult bestAttempt = validResults.stream()
-                        .max(Comparator.comparingInt(TestResult::getScore))
+                        .max(Comparator.comparingDouble(r ->
+                                (double) r.getScore() / r.getMaxScore()))
                         .orElse(null);
 
                 if (bestAttempt != null) {
@@ -441,7 +465,10 @@ public class StatisticsService {
                     statDto.setMaxScore(bestAttempt.getMaxScore());
                     statDto.setCompletedAt(bestAttempt.getCompletedAt());
                     statDto.setAttemptNumber(bestAttempt.getAttemptNumber());
-                    statDto.setPercentage((double) bestAttempt.getScore() / bestAttempt.getMaxScore() * 100);
+
+                    // Calculate percentage based on actual questions shown
+                    double percentage = (double) bestAttempt.getScore() / bestAttempt.getMaxScore() * 100;
+                    statDto.setPercentage(Math.round(percentage * 100) / 100.0);
 
                     testStats.add(statDto);
                 }
@@ -455,12 +482,11 @@ public class StatisticsService {
         viewDto.setStudentId(student.getId());
         viewDto.setStudentName(student.getFullName());
 
-        // Проверка на null перед обращением к Grade
+        // Check for null before accessing Grade
         if (student.getGrade() != null) {
             viewDto.setGradeId(student.getGrade().getId());
             viewDto.setGradeName(student.getGrade().getFullName());
         } else {
-            // Установка значений по умолчанию или null
             viewDto.setGradeId(null);
             viewDto.setGradeName("Класс не назначен");
         }
@@ -579,16 +605,24 @@ public class StatisticsService {
             int completedTests = 0;
 
             for (List<TestResult> testResults : resultsByTest.values()) {
-                // Fixed: Filter out null objects and null scores before comparing
-                TestResult bestAttempt = testResults.stream()
-                        .filter(result -> result != null && result.getScore() != null)
-                        .max(Comparator.comparingInt(TestResult::getScore))
-                        .orElse(null);
+                // Filter only completed attempts with valid scores
+                List<TestResult> validResults = testResults.stream()
+                        .filter(r -> r.isCompleted())
+                        .filter(r -> r.getScore() != null && r.getMaxScore() != null && r.getMaxScore() > 0)
+                        .collect(Collectors.toList());
 
-                if (bestAttempt != null) {
-                    totalScore += bestAttempt.getScore();
-                    totalMaxScore += bestAttempt.getMaxScore();
-                    completedTests++;
+                if (!validResults.isEmpty()) {
+                    // Find best attempt based on percentage score rather than raw score
+                    TestResult bestAttempt = validResults.stream()
+                            .max(Comparator.comparingDouble(r ->
+                                    (double) r.getScore() / r.getMaxScore()))
+                            .orElse(null);
+
+                    if (bestAttempt != null) {
+                        totalScore += bestAttempt.getScore();
+                        totalMaxScore += bestAttempt.getMaxScore();
+                        completedTests++;
+                    }
                 }
             }
 
@@ -596,13 +630,24 @@ public class StatisticsService {
                 UserStatDto statDto = new UserStatDto();
                 statDto.setUserId(student.getId());
                 statDto.setUserName(student.getFullName());
-                statDto.setGradeId(student.getGrade().getId());
-                statDto.setGradeName(student.getGrade().getFullName());
+
+                // Check for null before accessing Grade
+                if (student.getGrade() != null) {
+                    statDto.setGradeId(student.getGrade().getId());
+                    statDto.setGradeName(student.getGrade().getFullName());
+                } else {
+                    statDto.setGradeId(null);
+                    statDto.setGradeName("Класс не назначен");
+                }
+
                 statDto.setScore(totalScore);
                 statDto.setMaxScore(totalMaxScore);
                 statDto.setCompletedTests(completedTests);
-                statDto.setAveragePercentage(totalMaxScore > 0 ?
-                        (double) totalScore / totalMaxScore * 100 : 0);
+
+                // Calculate percentage based on actual questions shown
+                double averagePercentage = totalMaxScore > 0 ?
+                        (double) totalScore / totalMaxScore * 100 : 0;
+                statDto.setAveragePercentage(Math.round(averagePercentage * 100) / 100.0);
 
                 studentStats.add(statDto);
             }
