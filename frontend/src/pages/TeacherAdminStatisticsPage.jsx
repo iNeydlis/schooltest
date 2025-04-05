@@ -169,17 +169,10 @@ const TeacherAdminStatisticsPage = () => {
                             <div style={statsIconStyle}>🏆</div>
                             <div>
                                 <p style={statsLabelStyle}>Средний результат</p>
-                                <p style={statsValueStyle}>{viewData.averagePercentage ? viewData.averagePercentage.toFixed(1) : '0.0'}%</p>
+                                <p style={statsValueStyle}>{viewData.averageScore ? viewData.averageScore.toFixed(1) : '0.0'}%</p>
                             </div>
                         </div>
 
-                        <div style={statsCardStyle}>
-                            <div style={statsIconStyle}>✅</div>
-                            <div>
-                                <p style={statsLabelStyle}>Выполнено тестов</p>
-                                <p style={statsValueStyle}>{viewData.completedTests || 0}</p>
-                            </div>
-                        </div>
 
                         <div style={statsCardStyle}>
                             <div style={statsIconStyle}>👥</div>
@@ -269,7 +262,7 @@ const TeacherAdminStatisticsPage = () => {
                             <option value="">Выберите класс</option>
                             {grades.map(grade => (
                                 <option key={grade.id} value={grade.id}>
-                                    {grade.name}
+                                    {grade.fullName}
                                 </option>
                             ))}
                         </select>
@@ -320,25 +313,25 @@ const TeacherAdminStatisticsPage = () => {
                                 </thead>
                                 <tbody>
                                 {viewData.userStats.map((stat, index) => (
-                                    <tr key={`${stat.studentId}-${index}`} style={trStyle}>
-                                        <td style={tdStyle}>{stat.studentName}</td>
+                                    <tr key={`${stat.userId}-${index}`} style={trStyle}>
+                                        <td style={tdStyle}>{stat.userName}</td>
                                         <td style={tdStyle}>{stat.gradeName || 'Н/Д'}</td>
                                         {selectedView === 'test' && <td style={tdStyle}>{formatDate(stat.completedAt)}</td>}
                                         <td style={tdStyle}>
                                             <span style={{
                                                 ...badgeStyle,
-                                                backgroundColor: getPerformanceColor(stat.percentage || 0)
+                                                backgroundColor: getPerformanceColor(stat.averagePercentage || 0)
                                             }}>
-                                                {stat.percentage ? stat.percentage.toFixed(1) : '0.0'}%
+                                                {stat.averagePercentage ? stat.averagePercentage.toFixed(1) : '0.0'}%
                                             </span>
                                         </td>
                                         <td style={tdStyle}>{stat.score || 0} / {stat.maxScore || 0}</td>
                                         <td style={tdStyle}>
                                             <span style={{
                                                 ...badgeStyle,
-                                                backgroundColor: getPerformanceColor(stat.percentage || 0)
+                                                backgroundColor: getPerformanceColor(stat.averagePercentage || 0)
                                             }}>
-                                                {getPerformanceText(stat.percentage || 0)}
+                                                {getPerformanceText(stat.averagePercentage || 0)}
                                             </span>
                                         </td>
                                     </tr>
